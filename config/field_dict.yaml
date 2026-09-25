@@ -1,0 +1,142 @@
+# 字段字典 - 定义所有需要提取的财务字段
+
+version: "1.0.0"
+
+# 利润表字段
+income_statement:
+  - id: "revenue"
+    name: "营业收入"
+    aliases: ["营业总收入", "主营业务收入"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "operating_cost"
+    name: "营业成本"
+    aliases: ["主营业务成本"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "gross_profit"
+    name: "毛利润"
+    aliases: ["营业毛利"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "operating_expense"
+    name: "营业费用"
+    aliases: ["期间费用"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "operating_profit"
+    name: "营业利润"
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "net_profit"
+    name: "归属于母公司股东的净利润"
+    aliases: ["归母净利润", "净利润"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "net_profit_deducted"
+    name: "扣除非经常性损益后的净利润"
+    aliases: ["扣非净利润"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "non_recurring_profit"
+    name: "非经常性损益"
+    unit: "CNY"
+    type: "numeric"
+
+# 资产负债表字段
+balance_sheet:
+  - id: "total_assets"
+    name: "资产总计"
+    aliases: ["总资产"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "total_liabilities"
+    name: "负债合计"
+    aliases: ["总负债"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "net_assets"
+    name: "所有者权益合计"
+    aliases: ["净资产", "股东权益"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "accounts_receivable"
+    name: "应收账款"
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "inventory"
+    name: "存货"
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "goodwill"
+    name: "商誉"
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "current_assets"
+    name: "流动资产合计"
+    aliases: ["流动资产"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "current_liabilities"
+    name: "流动负债合计"
+    aliases: ["流动负债"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "cash_and_equivalents"
+    name: "货币资金"
+    aliases: ["现金及现金等价物"]
+    unit: "CNY"
+    type: "numeric"
+
+# 现金流量表字段
+cash_flow:
+  - id: "operating_cash_flow"
+    name: "经营活动产生的现金流量净额"
+    aliases: ["经营现金流"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "investing_cash_flow"
+    name: "投资活动产生的现金流量净额"
+    aliases: ["投资现金流"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "financing_cash_flow"
+    name: "筹资活动产生的现金流量净额"
+    aliases: ["筹资现金流"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "free_cash_flow"
+    name: "自由现金流"
+    unit: "CNY"
+    type: "calculated"
+    formula: "operating_cash_flow - capex"
+
+# 单位换算规则
+unit_conversion:
+  - from: "元"
+    to: "CNY"
+    factor: 1
+  - from: "万元"
+    to: "CNY"
+    factor: 10000
+  - from: "亿元"
+    to: "CNY"
+    factor: 100000000

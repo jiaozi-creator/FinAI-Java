@@ -1,0 +1,99 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build outputs
+target/
+build/
+dist/
+out/
+*.class
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+data/finai.*
+
+# Uploads and local database
+backend/data/
+data/uploads/
+data/raw/*.pdf
+data/structured/*.csv
+data/structured/*.json
+
+# Outputs
+outputs/reports/*
+outputs/evidence/*
+!outputs/reports/.gitkeep
+!outputs/evidence/.gitkeep
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+*.cover
+.hypothesis/
+.pytest_cache/
+test-results/
+junit.xml
+
+# OS
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
+
+# Java
+*.jar
+!gradle-wrapper.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+
+# Gradle
+.gradle/
+gradle/
+
+# Package files
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Spring Boot
+spring-boot-*.log
+
+# Compiled files
+bin/
+
+# Temporary files
+tmp/
+temp/

@@ -1,0 +1,35 @@
+:root {
+  --ink: #1c1915;
+  --muted: #6f685d;
+  --line: #e5dfd3;
+  --paper: #f3f0e8;
+  --sheet: #fffcf8;
+  --ink-bar: #172028;
+  --teal: #0c6b63;
+  --teal-soft: #e6f3f1;
+  --gold: #8d6b32;
+  --danger: #9d3d34;
+  --ok: #1d7a46;
+  --shadow: 0 1px 0 rgba(28, 25, 21, 0.04);
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+button, input, textarea { font-family: inherit; }
+
+#root { min-height: 100vh; }
+
+h1, h2, h3, .serif {
+  font-family: "Palatino Linotype", Palatino, "Songti SC", "Noto Serif SC", serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}

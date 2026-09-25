@@ -1,0 +1,177 @@
+spring:
+  application:
+    name: finai-backend
+
+  profiles:
+    active: ${SPRING_PROFILE:dev}
+
+  datasource:
+    url: ${DB_URL:jdbc:h2:./data/finai;MODE=MySQL;DATABASE_TO_LOWER=TRUE}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+    driver-class-name: ${DB_DRIVER:org.h2.Driver}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+        globally_quoted_identifiers: true
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  servlet:
+    multipart:
+      max-file-size: ${UPLOAD_MAX_FILE_SIZE:50MB}
+      max-request-size: ${UPLOAD_MAX_REQUEST_SIZE:100MB}
+      enabled: true
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      indent-output: true
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+server:
+  port: ${SERVER_PORT:8080}
+  address: ${SERVER_HOST:0.0.0.0}
+  compression:
+    enabled: true
+  error:
+    include-message: always
+    include-binding-errors: always
+
+# Custom Application Configuration
+finai:
+  # LLM Configuration
+  llm:
+    provider: ${LLM_PROVIDER:aliyun}
+    model: ${LLM_MODEL:claude-3-sonnet-20240229}
+    temperature: ${LLM_TEMPERATURE:0.0}
+    max-tokens: ${LLM_MAX_TOKENS:4096}
+    timeout: ${LLM_TIMEOUT:60000}
+
+    aliyun:
+      api-key: ${ALIYUN_API_KEY:}
+      base-url: ${ALIYUN_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}
+      api-base: ${ANTHROPIC_API_BASE:https://api.anthropic.com}
+
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      api-base: ${OPENAI_API_BASE:https://api.openai.com/v1}
+
+  # Data Directories
+  data:
+    raw-dir: ${DATA_RAW_DIR:./data/raw}
+    structured-dir: ${DATA_STRUCTURED_DIR:./data/structured}
+    manifests-dir: ${DATA_MANIFESTS_DIR:./data/manifests}
+    upload-dir: ${UPLOAD_DIR:./data/uploads}
+
+  # Output Directories
+  output:
+    reports-dir: ${OUTPUT_REPORTS_DIR:./outputs/reports}
+    evidence-dir: ${OUTPUT_EVIDENCE_DIR:./outputs/evidence}
+
+  # Config Files
+  config:
+    companies-file: ${CONFIG_COMPANIES_FILE:./config/companies.yaml}
+    field-dict-file: ${CONFIG_FIELD_DICT_FILE:./config/field_dict.yaml}
+    formulas-file: ${CONFIG_FORMULAS_FILE:./config/formulas.yaml}
+    rules-file: ${CONFIG_RULES_FILE:./config/rules.yaml}
+
+  # Agent Configuration
+  agent:
+    max-iterations: ${AGENT_MAX_ITERATIONS:10}
+    enable-degradation: ${AGENT_ENABLE_DEGRADATION:true}
+    enable-audit: ${AGENT_ENABLE_AUDIT:true}
+
+  # Tool Configuration
+  tool:
+    calc-precision: ${TOOL_CALC_PRECISION:10}
+    calc-rounding-mode: ${TOOL_CALC_ROUNDING_MODE:HALF_UP}
+
+  # PDF Parser Configuration
+  pdf:
+    parser-engine: ${PDF_PARSER_ENGINE:pdfbox}
+
+  # OCR Configuration
+  ocr:
+    enabled: ${OCR_ENABLED:false}
+    language: ${OCR_LANGUAGE:chi_sim}
+
+  # Cache Configuration
+  cache:
+    enabled: ${CACHE_ENABLED:true}
+    ttl: ${CACHE_TTL:3600}
+
+  # Feature Flags
+  features:
+    valuation-enabled: ${FEATURE_VALUATION_ENABLED:true}
+    anomaly-detection-enabled: ${FEATURE_ANOMALY_DETECTION_ENABLED:true}
+    evidence-tracking-enabled: ${FEATURE_EVIDENCE_TRACKING_ENABLED:true}
+    mcp-enabled: ${FEATURE_MCP_ENABLED:true}
+
+  # Development Mode
+  dev:
+    mode: ${DEV_MODE:true}
+    mock-llm: ${DEV_MOCK_LLM:false}
+    skip-auth: ${DEV_SKIP_AUTH:true}
+
+# Logging Configuration
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+    com.finai: DEBUG
+    org.springframework.web: INFO
+    org.hibernate: WARN
+    dev.langchain4j: DEBUG
+  file:
+    name: ${LOG_FILE_PATH:./logs/finai.log}
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# CORS Configuration
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
+  allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+  allowed-headers: "*"
+  allow-credentials: true
+  max-age: 3600
+
+# Springdoc OpenAPI
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true

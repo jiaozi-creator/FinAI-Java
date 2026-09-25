@@ -1,0 +1,32 @@
+# 样本公司配置
+
+companies:
+  - code: "600519"
+    name: "贵州茅台"
+    industry: "白酒制造"
+    sector: "食品饮料"
+    reports:
+      - period: "2023A"
+        type: "annual"
+        file: "data/raw/600519_2023_annual.pdf"
+      - period: "2023Q3"
+        type: "quarterly"
+        file: "data/raw/600519_2023Q3.pdf"
+
+  - code: "000858"
+    name: "五粮液"
+    industry: "白酒制造"
+    sector: "食品饮料"
+    reports:
+      - period: "2023A"
+        type: "annual"
+        file: "data/raw/000858_2023_annual.pdf"
+
+  - code: "601318"
+    name: "中国平安"
+    industry: "保险"
+    sector: "金融"
+    reports:
+      - period: "2023A"
+        type: "annual"
+        file: "data/raw/601318_2023_annual.pdf"

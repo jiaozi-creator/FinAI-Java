@@ -1,0 +1,128 @@
+# 异常规则配置
+
+version: "1.0.0"
+
+rules:
+  # 收入与利润匹配性
+  - id: "revenue_profit_mismatch"
+    name: "增收不增利"
+    category: "growth_quality"
+    severity: "medium"
+    description: "营业收入增长但净利润下降"
+    conditions:
+      - field: "revenue_growth_yoy"
+        operator: ">"
+        threshold: 0
+      - field: "net_profit_growth_yoy"
+        operator: "<"
+        threshold: 0
+    verification:
+      - check_cost_ratio
+      - check_expense_ratio
+
+  # 利润与现金流背离
+  - id: "profit_cashflow_divergence"
+    name: "利润与现金流背离"
+    category: "earnings_quality"
+    severity: "high"
+    description: "净利润为正但经营现金流为负，或两者差异过大"
+    conditions:
+      - field: "ocf_to_net_profit_ratio"
+        operator: "<"
+        threshold: 0.8
+    verification:
+      - check_accounts_receivable
+      - check_inventory
+      - check_prepayments
+
+  # 应收账款异常
+  - id: "accounts_receivable_high"
+    name: "应收账款占比过高"
+    category: "asset_quality"
+    severity: "medium"
+    description: "应收账款占营业收入比例过高"
+    conditions:
+      - field: "accounts_receivable_to_revenue"
+        operator: ">"
+        threshold: 0.3
+    verification:
+      - check_turnover_days
+      - check_allowance_ratio
+
+  # 存货积压
+  - id: "inventory_accumulation"
+    name: "存货积压"
+    category: "asset_quality"
+    severity: "medium"
+    description: "存货周转率下降或存货占比过高"
+    conditions:
+      - field: "inventory_turnover_ratio"
+        operator: "<"
+        threshold: 3
+    verification:
+      - check_inventory_growth
+      - check_impairment
+
+  # 商誉减值风险
+  - id: "goodwill_impairment_risk"
+    name: "商誉减值风险"
+    category: "asset_quality"
+    severity: "high"
+    description: "商誉占净资产比例过高"
+    conditions:
+      - field: "goodwill_to_net_assets"
+        operator: ">"
+        threshold: 0.2
+    verification:
+      - check_acquisition_performance
+
+  # 偿债压力
+  - id: "debt_pressure"
+    name: "偿债压力"
+    category: "solvency"
+    severity: "high"
+    description: "现金短债比过低或流动比率不足"
+    conditions:
+      - field: "cash_to_short_debt_ratio"
+        operator: "<"
+        threshold: 1.0
+    verification:
+      - check_debt_structure
+      - check_interest_coverage
+
+  # 非经常性损益占比高
+  - id: "non_recurring_items_high"
+    name: "非经常性损益占比过高"
+    category: "earnings_quality"
+    severity: "medium"
+    description: "非经常性损益占净利润比例过高"
+    conditions:
+      - field: "non_recurring_to_net_profit"
+        operator: ">"
+        threshold: 0.3
+    verification:
+      - check_item_sources
+
+  # 利润率下滑
+  - id: "margin_decline"
+    name: "利润率下滑"
+    category: "profitability"
+    severity: "medium"
+    description: "毛利率或净利率持续下降"
+    conditions:
+      - field: "gross_margin_change"
+        operator: "<"
+        threshold: -5  # 下降超过5个百分点
+    verification:
+      - check_industry_comparison
+      - check_cost_drivers
+
+# 阈值适用边界
+applicability:
+  - rule: "accounts_receivable_high"
+    industries: ["制造业", "批发零售"]
+    note: "金融、房地产等行业不适用"
+
+  - rule: "inventory_accumulation"
+    industries: ["制造业", "批发零售"]
+    note: "服务业不适用"
