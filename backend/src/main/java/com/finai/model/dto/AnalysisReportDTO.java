@@ -165,6 +165,11 @@ public class AnalysisReportDTO {
         private Long executionTimeMs;
         private String dataVersion;
         private String configVersion;
+        private String promptVersion;
+        private String skillVersion;
+        private String fileSha256;
+        private Double temperature;
+        private Boolean leavesMachine;
         private List<String> toolsUsed;
         private String generatedAt;
     }

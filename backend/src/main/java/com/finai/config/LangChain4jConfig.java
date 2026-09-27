@@ -18,6 +18,12 @@ public class LangChain4jConfig {
     @Value("${finai.llm.provider:aliyun}")
     private String llmProvider;
 
+    @Value("${finai.llm.model:qwen-plus}")
+    private String modelName;
+
+    @Value("${finai.llm.temperature:0.0}")
+    private double temperature;
+
     @Value("${finai.llm.anthropic.api-key:}")
     private String anthropicApiKey;
 
@@ -31,54 +37,49 @@ public class LangChain4jConfig {
     private String aliyunBaseUrl;
 
     @Bean
-    public ChatLanguageModel chatLanguageModel() {
-        log.info("Initializing ChatLanguageModel with provider: {}", llmProvider);
+    public LlmRuntime llmRuntime() {
+        boolean mock = switch (llmProvider.toLowerCase()) {
+            case "aliyun" -> aliyunApiKey.isBlank();
+            case "claude" -> anthropicApiKey.isBlank();
+            case "openai" -> openaiApiKey.isBlank();
+            default -> true;
+        };
+        log.info("LLM runtime provider={} model={} temperature={} mock={}", llmProvider, modelName, temperature, mock);
+        return new LlmRuntime(llmProvider, modelName, temperature, mock);
+    }
 
-        if ("aliyun".equalsIgnoreCase(llmProvider)) {
-            if (aliyunApiKey.isEmpty()) {
-                log.warn("Aliyun API key not configured, using mock model");
-                return createMockModel();
-            }
-
-            log.info("Using Aliyun Qwen model");
-            // Use OpenAI-compatible API for Aliyun
+    @Bean
+    public ChatLanguageModel chatLanguageModel(LlmRuntime runtime) {
+        if (runtime.isMock()) {
+            log.warn("No API key for provider {}, using mock model", runtime.getProvider());
+            return createMockModel();
+        }
+        if ("aliyun".equalsIgnoreCase(runtime.getProvider())) {
             return OpenAiChatModel.builder()
                     .apiKey(aliyunApiKey)
                     .baseUrl(aliyunBaseUrl.isEmpty() ? "https://dashscope.aliyuncs.com/compatible-mode/v1" : aliyunBaseUrl)
-                    .modelName("qwen-plus")  // 使用千问模型
-                    .temperature(0.7)
+                    .modelName(runtime.getModel())
+                    .temperature(runtime.getTemperature())
                     .maxTokens(2000)
                     .build();
-        } else if ("claude".equalsIgnoreCase(llmProvider)) {
-            if (anthropicApiKey.isEmpty()) {
-                log.warn("Anthropic API key not configured, using mock model");
-                return createMockModel();
-            }
-
-            log.info("Using Claude (Anthropic) model");
+        }
+        if ("claude".equalsIgnoreCase(runtime.getProvider())) {
             return AnthropicChatModel.builder()
                     .apiKey(anthropicApiKey)
-                    .modelName("claude-3-sonnet-20240229")
-                    .temperature(0.7)
+                    .modelName(runtime.getModel())
+                    .temperature(runtime.getTemperature())
                     .maxTokens(2000)
                     .build();
-        } else if ("openai".equalsIgnoreCase(llmProvider)) {
-            if (openaiApiKey.isEmpty()) {
-                log.warn("OpenAI API key not configured, using mock model");
-                return createMockModel();
-            }
-
-            log.info("Using OpenAI GPT model");
+        }
+        if ("openai".equalsIgnoreCase(runtime.getProvider())) {
             return OpenAiChatModel.builder()
                     .apiKey(openaiApiKey)
-                    .modelName("gpt-4")
-                    .temperature(0.7)
+                    .modelName(runtime.getModel())
+                    .temperature(runtime.getTemperature())
                     .maxTokens(2000)
                     .build();
-        } else {
-            log.warn("Unknown LLM provider: {}, using mock model", llmProvider);
-            return createMockModel();
         }
+        return createMockModel();
     }
 
     /**

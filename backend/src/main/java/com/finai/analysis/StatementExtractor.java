@@ -7,10 +7,13 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,28 +33,11 @@ public class StatementExtractor {
     private static final Pattern NO_MATERIAL = Pattern.compile("无重大|未发生|本期无|不存在|不适用|无变更|没有发生|无需变更");
     private static final Pattern CONFIRMED = Pattern.compile("追溯|变更了|调整了|采用新|新准则|重要会计估计变更");
 
-    private static final List<Spec> SPECS = List.of(
-            new Spec("revenue", "营业收入", List.of("营业总收入", "营业收入")),
-            new Spec("operating_cost", "营业成本", List.of("营业成本")),
-            new Spec("net_profit", "归母净利润", List.of("归属于上市公司股东的净利润", "归属于母公司所有者的净利润", "归属于母公司股东的净利润", "净利润")),
-            new Spec("net_profit_deducted", "扣非净利润", List.of("归属于上市公司股东的扣除非经常性损益的净利润", "扣除非经常性损益后的净利润", "扣除非经常性损益的净利润")),
-            new Spec("operating_cash_flow", "经营活动现金流", List.of("经营活动产生的现金流量净额")),
-            new Spec("capex", "资本开支", List.of("购建固定资产、无形资产和其他长期资产支付的现金")),
-            new Spec("total_assets", "资产总计", List.of("资产总计", "资产合计", "总资产")),
-            new Spec("total_liabilities", "负债合计", List.of("负债合计", "负债总计")),
-            new Spec("net_assets", "归母权益", List.of("归属于上市公司股东的净资产", "归属于母公司所有者权益合计", "归属于母公司所有者权益（或股东权益）合计", "归属于母公司股东权益合计", "所有者权益合计", "股东权益合计")),
-            new Spec("cash", "货币资金", List.of("货币资金")),
-            new Spec("accounts_receivable", "应收账款", List.of("应收账款")),
-            new Spec("inventory", "存货", List.of("存货")),
-            new Spec("goodwill", "商誉", List.of("商誉")),
-            new Spec("current_assets", "流动资产合计", List.of("流动资产合计")),
-            new Spec("current_liabilities", "流动负债合计", List.of("流动负债合计")),
-            new Spec("short_term_debt", "短期借款", List.of("短期借款")),
-            new Spec("long_term_debt", "长期借款", List.of("长期借款")),
-            new Spec("minority_interest", "少数股东权益", List.of("少数股东权益")),
-            new Spec("shares_outstanding", "期末总股本", List.of("期末总股本")),
-            new Spec("basic_eps", "基本每股收益", List.of("基本每股收益（元／股）", "基本每股收益（元/股）", "基本每股收益"))
-    );
+    private final List<FieldSpec> specs;
+
+    public StatementExtractor() {
+        this.specs = AnalysisConfig.get().fields();
+    }
 
     public StatementExtract extract(String filePath) {
         if (filePath == null || filePath.isBlank()) {
@@ -63,9 +49,10 @@ public class StatementExtractor {
             return empty();
         }
         try {
+            String sha256 = sha256(path);
             if (filePath.toLowerCase().endsWith(".txt")) {
                 String text = Files.readString(path, StandardCharsets.UTF_8);
-                return extractPages(List.of(new PageText(1, text)), filePath);
+                return withFile(extractPages(List.of(new PageText(1, text)), filePath), filePath, sha256, 1);
             }
             try (PDDocument document = Loader.loadPDF(path.toFile())) {
                 PDFTextStripper stripper = new PDFTextStripper();
@@ -77,7 +64,7 @@ public class StatementExtractor {
                     stripper.setEndPage(i);
                     pages.add(new PageText(i, stripper.getText(document)));
                 }
-                return extractPages(pages, filePath);
+                return withFile(extractPages(pages, filePath), filePath, sha256, total);
             }
         } catch (IOException e) {
             throw new IllegalStateException("读取财报失败: " + filePath, e);
@@ -88,6 +75,7 @@ public class StatementExtractor {
         List<ExtractedLine> found = new ArrayList<>();
         List<PolicyNote> notes = new ArrayList<>();
         String carriedUnit = "未标注";
+        String section = "other";
         boolean[] nonRecurringOpen = {false};
         for (PageText page : pages) {
             String text = page.getText() == null ? "" : page.getText();
@@ -96,18 +84,22 @@ public class StatementExtractor {
                 carriedUnit = detectedUnit;
             }
             String unit = carriedUnit;
-            String scope = detectScope(text);
             String[] rows = text.split("\\R");
             for (int i = 0; i < rows.length; i++) {
+                section = nextSection(rows[i], section);
+                String scope = scopeOf(section);
                 ExtractedLine line = matchLine(rows[i], page.getPageNumber(), unit, scope, sourceFile);
                 if (line == null) {
                     line = matchWrapped(rows, i, page.getPageNumber(), unit, scope, sourceFile);
+                }
+                if (line == null) {
+                    line = matchDeductedFragment(rows[i], page.getPageNumber(), unit, scope, sourceFile);
                 }
                 if (line != null) {
                     found.add(line);
                 }
             }
-            parseNonRecurring(text, page.getPageNumber(), unit, scope, sourceFile, found, nonRecurringOpen);
+            parseNonRecurring(text, page.getPageNumber(), unit, scopeOf(section), sourceFile, found, nonRecurringOpen);
             PolicyNote note = matchPolicy(text, page.getPageNumber());
             if (note != null) {
                 notes.add(note);
@@ -124,9 +116,9 @@ public class StatementExtractor {
         if (line.isEmpty()) {
             return null;
         }
-        Spec best = null;
+        FieldSpec best = null;
         String bestAlias = null;
-        for (Spec spec : SPECS) {
+        for (FieldSpec spec : specs) {
             for (String alias : spec.aliases()) {
                 if (!line.startsWith(alias)) {
                     continue;
@@ -157,30 +149,118 @@ public class StatementExtractor {
      */
     private ExtractedLine matchWrapped(String[] rows, int index, int page, String unit, String scope, String sourceFile) {
         String line = normalize(rows[index]);
-        if (line.length() < 8 || index + 1 >= rows.length) {
+        if (line.length() < 4 || index + 1 >= rows.length) {
             return null;
         }
-        Spec best = null;
-        for (Spec spec : SPECS) {
+        FieldSpec best = null;
+        int bestLen = -1;
+        for (FieldSpec spec : specs) {
             for (String alias : spec.aliases()) {
-                if (alias.startsWith(line) && alias.length() > line.length()) {
-                    if (best == null || alias.length() > best.aliases().stream().mapToInt(String::length).max().orElse(0)) {
-                        best = spec;
-                    }
+                boolean broken = alias.startsWith(line) && alias.length() > line.length() && line.length() >= 8;
+                boolean labelOnly = lineStartsAlias(line, alias) && readNumbers(tailAfter(line, alias)).isEmpty();
+                if (!broken && !labelOnly) {
+                    continue;
+                }
+                if (alias.length() > bestLen) {
+                    best = spec;
+                    bestLen = alias.length();
                 }
             }
         }
         if (best == null) {
             return null;
         }
-        List<BigDecimal> numbers = readNumbers(normalize(rows[index + 1]));
+        List<BigDecimal> numbers = List.of();
+        String numberLine = "";
+        for (int offset = 1; offset <= 2 && index + offset < rows.length; offset++) {
+            numberLine = normalize(rows[index + offset]);
+            numbers = readNumbers(numberLine);
+            if (!numbers.isEmpty()) {
+                break;
+            }
+        }
         if (numbers.isEmpty()) {
             return null;
         }
-        return toLine(best, numbers, page, unit, scope, sourceFile, line + " " + normalize(rows[index + 1]));
+        return toLine(best, numbers, page, unit, scope, sourceFile, line + " " + numberLine);
     }
 
-    private ExtractedLine toLine(Spec best, List<BigDecimal> numbers, int page, String unit, String scope, String sourceFile, String snippet) {
+    /**
+     * 主要会计数据里，扣非科目被拆行，2023 年金额会单独落在上一行。
+     * 只接受同一行里同时出现的本期和上期。
+     */
+    private ExtractedLine matchDeductedFragment(String raw, int page, String unit, String scope, String sourceFile) {
+        String line = normalize(raw);
+        if (!line.contains("扣除非经常")) {
+            return null;
+        }
+        List<BigDecimal> numbers = readNumbers(line);
+        if (numbers.size() < 2) {
+            return null;
+        }
+        return toLine(new FieldSpec("net_profit_deducted", "扣非净利润", List.of("扣除非经常性损益的净利润")),
+                numbers, page, unit, scope, sourceFile, line);
+    }
+
+    private static boolean lineStartsAlias(String line, String alias) {
+        return line.equals(alias) || (line.startsWith(alias) && boundary(line, alias.length()));
+    }
+
+    private static String tailAfter(String line, String alias) {
+        if (line.length() <= alias.length()) {
+            return "";
+        }
+        return line.substring(alias.length());
+    }
+
+    private static String nextSection(String raw, String current) {
+        String line = raw == null ? "" : raw.replace(" ", "").replace("\u00a0", "");
+        line = line.replaceFirst("^[（(][一二三四五六七八九十0-9]+[)）]", "");
+        line = line.replaceFirst("^[一二三四五六七八九十0-9]+[、.．]", "");
+        if (line.startsWith("购买日公允价值") || line.startsWith("被购买方于购买日")) {
+            return "note";
+        }
+        if (line.startsWith("主要会计数据")) {
+            return "summary";
+        }
+        if (line.startsWith("母公司资产负债表")) {
+            return "parent-bs";
+        }
+        if (line.startsWith("母公司利润表")) {
+            return "parent-is";
+        }
+        if (line.startsWith("母公司现金流量表")) {
+            return "parent-cf";
+        }
+        if (line.startsWith("合并资产负债表")) {
+            return "consolidated-bs";
+        }
+        if (line.startsWith("合并利润表")) {
+            return "consolidated-is";
+        }
+        if (line.startsWith("合并现金流量表")) {
+            return "consolidated-cf";
+        }
+        return current;
+    }
+
+    private static String scopeOf(String section) {
+        if (section.startsWith("consolidated")) {
+            return "consolidated";
+        }
+        if (section.startsWith("parent")) {
+            return "parent";
+        }
+        if ("summary".equals(section)) {
+            return "summary";
+        }
+        if ("note".equals(section)) {
+            return "note";
+        }
+        return "unknown";
+    }
+
+    private ExtractedLine toLine(FieldSpec best, List<BigDecimal> numbers, int page, String unit, String scope, String sourceFile, String snippet) {
         return ExtractedLine.builder()
                 .fieldId(best.fieldId())
                 .fieldName(best.name())
@@ -222,11 +302,11 @@ public class StatementExtractor {
             List<BigDecimal> numbers = readNumbers(line);
             String letters = line.replaceAll("[0-9,，.\\-()（）\\s%/／]", "");
             if (line.startsWith("合计") && !numbers.isEmpty()) {
-                found.add(toLine(new Spec("nri_total", "非经常性损益合计", List.of("合计")), numbers, page, unit, scope, sourceFile, line));
+                found.add(toLine(new FieldSpec("nri_total", "非经常性损益合计", List.of("合计")), numbers, page, unit, scope, sourceFile, line));
                 label.setLength(0);
                 continue;
             }
-            Spec spec = nriSpec(line);
+            FieldSpec spec = nriSpec(line);
             if (spec != null && !numbers.isEmpty()) {
                 found.add(toLine(spec, numbers, page, unit, scope, sourceFile, line));
                 label.setLength(0);
@@ -238,7 +318,7 @@ public class StatementExtractor {
                     around.append(normalize(rows[i + 1]));
                 }
                 String window = around.substring(Math.max(0, around.length() - 48));
-                Spec wrapped = nriSpec(window);
+                FieldSpec wrapped = nriSpec(window);
                 if (wrapped != null) {
                     found.add(toLine(wrapped, numbers, page, unit, scope, sourceFile, around + " " + line));
                 }
@@ -249,27 +329,27 @@ public class StatementExtractor {
         }
     }
 
-    private static Spec nriSpec(String label) {
+    private static FieldSpec nriSpec(String label) {
         if (label.contains("公允价值")) {
-            return new Spec("nri_fair_value", "公允价值变动损益", List.of("公允价值变动损益"));
+            return new FieldSpec("nri_fair_value", "公允价值变动损益", List.of("公允价值变动损益"));
         }
         if (label.contains("资产处置")) {
-            return new Spec("nri_disposal", "资产处置损益", List.of("资产处置损益"));
+            return new FieldSpec("nri_disposal", "资产处置损益", List.of("资产处置损益"));
         }
         if (label.contains("政府补助") && !label.contains("政府补助除外")) {
-            return new Spec("nri_subsidy", "政府补助", List.of("政府补助"));
+            return new FieldSpec("nri_subsidy", "政府补助", List.of("政府补助"));
         }
         if (label.contains("其他营业外")) {
-            return new Spec("nri_other", "其他营业外收支", List.of("其他营业外收支"));
+            return new FieldSpec("nri_other", "其他营业外收支", List.of("其他营业外收支"));
         }
         if (label.contains("其他符合非经常性")) {
-            return new Spec("nri_other_defined", "其他非经常性损益", List.of("其他非经常性损益"));
+            return new FieldSpec("nri_other_defined", "其他非经常性损益", List.of("其他非经常性损益"));
         }
         if (label.contains("所得税影响")) {
-            return new Spec("nri_tax", "所得税影响额", List.of("所得税影响额"));
+            return new FieldSpec("nri_tax", "所得税影响额", List.of("所得税影响额"));
         }
         if (label.contains("少数股东权益影响")) {
-            return new Spec("nri_minority_impact", "少数股东权益影响额", List.of("少数股东权益影响额"));
+            return new FieldSpec("nri_minority_impact", "少数股东权益影响额", List.of("少数股东权益影响额"));
         }
         return null;
     }
@@ -308,11 +388,18 @@ public class StatementExtractor {
     }
 
     private int rank(ExtractedLine line) {
-        int scope = switch (line.getScope()) {
-            case "consolidated" -> 20;
-            case "unknown" -> 10;
+        int scope = switch (line.getScope() == null ? "" : line.getScope()) {
+            case "consolidated" -> 100;
+            case "summary" -> 40;
+            case "unknown" -> 20;
+            case "parent" -> 10;
+            case "note" -> 0;
             default -> 0;
         };
+        String snippet = line.getSnippet() == null ? "" : line.getSnippet();
+        if (snippet.contains("归属于") || snippet.contains("扣除非经常")) {
+            scope += 30;
+        }
         int score = scope + (line.getPrior() != null ? 1 : 0);
         if (line.getCurrent() != null && line.getPrior() != null
                 && line.getCurrent().abs().compareTo(new BigDecimal("1000")) > 0
@@ -387,6 +474,7 @@ public class StatementExtractor {
 
     private static String normalize(String raw) {
         String line = raw == null ? "" : raw.trim();
+        line = line.replaceFirst("^[（(][一二三四五六七八九十0-9]+[)）]\\s*", "");
         line = line.replaceFirst("^[一二三四五六七八九十0-9]+[、.．]\\s*", "");
         line = line.replaceFirst("^(其中|减|加|：|:)+\\s*", "");
         return line.trim();
@@ -410,10 +498,38 @@ public class StatementExtractor {
         return value.substring(0, max);
     }
 
-    private static StatementExtract empty() {
-        return StatementExtract.builder().lines(List.of()).policyNotes(List.of()).build();
+    private static StatementExtract withFile(StatementExtract body, String path, String sha256, int pageCount) {
+        return StatementExtract.builder()
+                .lines(body.getLines())
+                .policyNotes(body.getPolicyNotes())
+                .sourcePath(path)
+                .sha256(sha256)
+                .pageCount(pageCount)
+                .build();
     }
 
-    private record Spec(String fieldId, String name, List<String> aliases) {
+    private static String sha256(Path path) throws IOException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (InputStream input = Files.newInputStream(path)) {
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = input.read(buffer)) >= 0) {
+                    digest.update(buffer, 0, read);
+                }
+            }
+            byte[] hash = digest.digest();
+            StringBuilder hex = new StringBuilder(hash.length * 2);
+            for (byte value : hash) {
+                hex.append(String.format("%02x", value));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 不可用", e);
+        }
+    }
+
+    private static StatementExtract empty() {
+        return StatementExtract.builder().lines(List.of()).policyNotes(List.of()).pageCount(0).build();
     }
 }

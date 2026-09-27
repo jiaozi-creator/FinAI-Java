@@ -53,8 +53,24 @@ public class RiskWarningServiceImpl implements RiskWarningService {
         AnalysisTask task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskId));
 
-        // 检测所有风险
         List<RiskAlertDTO> alerts = detectRisks(taskId);
+        if (alerts.isEmpty()) {
+            return RiskAssessmentDTO.builder()
+                    .taskId(taskId)
+                    .companyCode(task.getCompanyCode())
+                    .companyName(task.getCompanyName())
+                    .reportPeriod(task.getReportPeriod())
+                    .overallRiskScore(null)
+                    .overallRiskLevel(null)
+                    .riskScores(java.util.Map.of())
+                    .alerts(List.of())
+                    .highRiskAreas(List.of())
+                    .riskTrend("未计算")
+                    .summary("未计算。造假、流动性、经营和市场风险检测还没有接入财报指标，本次不输出风险等级，也不给出建议。主链路里的异常规则在分析报告中，不在这里。")
+                    .recommendations(List.of())
+                    .assessedAt(LocalDateTime.now())
+                    .build();
+        }
 
         // 计算各类风险评分
         Map<RiskAlertDTO.RiskType, RiskAssessmentDTO.RiskScore> riskScores = calculateRiskScores(alerts);
@@ -207,13 +223,6 @@ public class RiskWarningServiceImpl implements RiskWarningService {
                 .filter(Objects::nonNull)
                 .forEach(recommendations::add);
 
-        // 如果建议不足3条，添加通用建议
-        if (recommendations.size() < 3) {
-            recommendations.add("定期监控财务指标变化，及时识别风险信号");
-            recommendations.add("加强内部控制，完善风险管理体系");
-            recommendations.add("保持充足的流动性储备，确保资金链安全");
-        }
-
         return new ArrayList<>(recommendations);
     }
 
@@ -230,7 +239,7 @@ public class RiskWarningServiceImpl implements RiskWarningService {
         } else if (level == RiskAlertDTO.RiskLevel.MEDIUM) {
             return "公司整体风险可控，但在某些领域存在中等程度风险，建议持续监控。";
         } else {
-            return "公司整体风险较低，财务状况相对健康，建议保持当前管理水平。";
+            return "已实现的检测项没有给出高风险。没有覆盖的风险类型不评分。";
         }
     }
 

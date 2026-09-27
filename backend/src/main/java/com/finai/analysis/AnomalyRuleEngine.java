@@ -16,9 +16,18 @@ import java.util.stream.Collectors;
 @Component
 public class AnomalyRuleEngine {
 
-    public static final String RULE_VERSION = "2026.1";
-    private static final BigDecimal NON_RECURRING_THRESHOLD = new BigDecimal("0.20");
-    private static final BigDecimal CASH_COVERAGE_THRESHOLD = new BigDecimal("0.50");
+    public static final String RULE_VERSION = AnalysisConfig.get().ruleVersion();
+
+    private final BigDecimal nonRecurringThreshold;
+    private final BigDecimal nonRecurringHighThreshold;
+    private final BigDecimal cashCoverageThreshold;
+
+    public AnomalyRuleEngine() {
+        AnalysisConfig config = AnalysisConfig.get();
+        this.nonRecurringThreshold = config.nonRecurringThreshold();
+        this.nonRecurringHighThreshold = config.nonRecurringHighThreshold();
+        this.cashCoverageThreshold = config.cashCoverageThreshold();
+    }
 
     public List<AnomalySignalDTO> detect(List<ExtractedLine> lines, FinancialMetricsDTO metrics, List<PolicyNote> notes) {
         Map<String, ExtractedLine> byField = lines.stream()
@@ -40,10 +49,10 @@ public class AnomalyRuleEngine {
         }
         BigDecimal gap = core.getNetProfit().subtract(core.getNetProfitDeducted()).abs();
         BigDecimal ratio = gap.divide(core.getNetProfit().abs(), 8, RoundingMode.HALF_UP);
-        if (ratio.compareTo(NON_RECURRING_THRESHOLD) < 0) {
+        if (ratio.compareTo(nonRecurringThreshold) < 0) {
             return;
         }
-        AnomalySignalDTO.Severity severity = ratio.compareTo(new BigDecimal("0.50")) >= 0
+        AnomalySignalDTO.Severity severity = ratio.compareTo(nonRecurringHighThreshold) >= 0
                 ? AnomalySignalDTO.Severity.HIGH
                 : AnomalySignalDTO.Severity.MEDIUM;
         signals.add(AnomalySignalDTO.builder()
@@ -52,12 +61,12 @@ public class AnomalyRuleEngine {
                 .type(AnomalySignalDTO.AnomalyType.NON_RECURRING_ITEMS)
                 .severity(severity)
                 .description("推论：|归母净利润-扣非净利润| / |归母净利润| = " + ratio.toPlainString()
-                        + "，高于阈值 " + NON_RECURRING_THRESHOLD.toPlainString() + "。差额本身不是非经常性损益附注合计数。")
+                        + "，高于阈值 " + nonRecurringThreshold.toPlainString() + "。差额本身不是非经常性损益附注合计数。")
                 .ruleTriggered("non_recurring_gap")
                 .ruleVersion(RULE_VERSION)
                 .actualValue(ratio)
-                .threshold(NON_RECURRING_THRESHOLD)
-                .deviation(ratio.subtract(NON_RECURRING_THRESHOLD))
+                .threshold(nonRecurringThreshold)
+                .deviation(ratio.subtract(nonRecurringThreshold))
                 .affectedMetrics(List.of("net_profit", "net_profit_deducted"))
                 .evidence(List.of(evidence(byField.get("net_profit")), evidence(byField.get("net_profit_deducted"))))
                 .verificationStatus(AnomalySignalDTO.VerificationStatus.PENDING)
@@ -80,7 +89,7 @@ public class AnomalyRuleEngine {
                 && yoy.getNetProfitGrowth().compareTo(BigDecimal.ZERO) > 0
                 && yoy.getOperatingCashFlowGrowth().compareTo(BigDecimal.ZERO) < 0;
         boolean signSplit = core.getOperatingCashFlow().compareTo(BigDecimal.ZERO) < 0;
-        boolean thin = coverage.compareTo(CASH_COVERAGE_THRESHOLD) < 0;
+        boolean thin = coverage.compareTo(cashCoverageThreshold) < 0;
         if (!signSplit && !thin && !yoySplit) {
             return;
         }
@@ -93,7 +102,7 @@ public class AnomalyRuleEngine {
             description.append("利润为正、经营现金流为负。");
         }
         if (thin) {
-            description.append("覆盖倍数低于 ").append(CASH_COVERAGE_THRESHOLD.toPlainString()).append("。");
+            description.append("覆盖倍数低于 ").append(cashCoverageThreshold.toPlainString()).append("。");
         }
         if (yoySplit) {
             description.append("归母净利润同比增长，经营现金流同比下降。");
@@ -107,8 +116,8 @@ public class AnomalyRuleEngine {
                 .ruleTriggered("profit_cashflow_divergence")
                 .ruleVersion(RULE_VERSION)
                 .actualValue(coverage)
-                .threshold(CASH_COVERAGE_THRESHOLD)
-                .deviation(coverage.subtract(CASH_COVERAGE_THRESHOLD))
+                .threshold(cashCoverageThreshold)
+                .deviation(coverage.subtract(cashCoverageThreshold))
                 .affectedMetrics(List.of("net_profit", "operating_cash_flow"))
                 .evidence(List.of(evidence(byField.get("net_profit")), evidence(byField.get("operating_cash_flow"))))
                 .verificationStatus(AnomalySignalDTO.VerificationStatus.PENDING)

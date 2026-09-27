@@ -142,15 +142,35 @@ public class AuditLogServiceImpl implements AuditLogService {
 
     @Override
     @Transactional
-    public void logLLMRequest(String taskId, String model, String prompt, String response, Long executionTime) {
+    public void logFileAccess(String taskId, String path, String sha256, long bytes, int pages) {
+        try {
+            AuditLog auditLog = AuditLog.builder()
+                    .taskId(taskId)
+                    .logType(AuditLog.LogType.DATA_PARSING)
+                    .operation("file.access")
+                    .details("sha256=" + sha256 + ",bytes=" + bytes + ",pages=" + pages)
+                    .inputParams(path)
+                    .outputResult(sha256)
+                    .status("SUCCESS")
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            auditLogRepository.save(auditLog);
+        } catch (Exception e) {
+            log.error("Failed to log file access", e);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void logLLMRequest(String taskId, String details, String model, String prompt, String response, Long executionTime) {
         try {
             AuditLog auditLog = AuditLog.builder()
                     .taskId(taskId)
                     .logType(AuditLog.LogType.LLM_REQUEST)
                     .operation("LLM_CALL")
-                    .details("LLM request: " + model)
-                    .inputParams(truncate(prompt, 2000))
-                    .outputResult(truncate(response, 2000))
+                    .details(details)
+                    .inputParams(prompt)
+                    .outputResult(response)
                     .status("SUCCESS")
                     .executionTimeMs(executionTime)
                     .version(model)
@@ -215,15 +235,5 @@ public class AuditLogServiceImpl implements AuditLogService {
         }
 
         return sb.toString();
-    }
-
-    /**
-     * 截断长文本
-     */
-    private String truncate(String text, int maxLength) {
-        if (text == null) {
-            return null;
-        }
-        return text.length() <= maxLength ? text : text.substring(0, maxLength) + "...";
     }
 }

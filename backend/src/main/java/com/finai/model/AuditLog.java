@@ -76,7 +76,7 @@ public class AuditLog {
     /**
      * 错误信息
      */
-    @Column(name = "error_message", length = 2000)
+    @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
     /**
@@ -86,9 +86,9 @@ public class AuditLog {
     private Long executionTimeMs;
 
     /**
-     * 工具/模型版本
+     * 工具或模型名。长哈希放 details，不放这个长度有限的字段。
      */
-    @Column(name = "version", length = 50)
+    @Column(name = "version", length = 120)
     private String version;
 
     /**

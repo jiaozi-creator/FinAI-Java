@@ -37,6 +37,7 @@ const RiskAssessment = () => {
   };
 
   const getRiskScoreColor = (score) => {
+    if (score == null || Number.isNaN(Number(score))) return 'text-gray-500';
     if (score >= 75) return 'text-red-600';
     if (score >= 50) return 'text-orange-600';
     if (score >= 25) return 'text-yellow-600';
@@ -86,11 +87,11 @@ const RiskAssessment = () => {
           <div className="text-center">
             <div className="inline-flex items-center justify-center w-32 h-32 rounded-full bg-gradient-to-br from-red-100 to-orange-100 mb-4">
               <div className={`text-5xl font-bold ${getRiskScoreColor(assessment.overallRiskScore)}`}>
-                {assessment.overallRiskScore.toFixed(0)}
+                {assessment.overallRiskScore == null ? '—' : Number(assessment.overallRiskScore).toFixed(0)}
               </div>
             </div>
             <div className={`inline-block px-6 py-2 rounded-full text-sm font-bold bg-gradient-to-r ${getRiskLevelColor(assessment.overallRiskLevel)} text-white mb-4`}>
-              {assessment.overallRiskLevel} RISK
+              {assessment.overallRiskLevel || '未评估'}
             </div>
             <p className="text-gray-700 text-lg max-w-2xl mx-auto">{assessment.summary}</p>
           </div>
@@ -98,7 +99,7 @@ const RiskAssessment = () => {
 
         {/* Risk Categories Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          {Object.entries(assessment.riskScores).map(([type, data]) => (
+          {Object.entries(assessment.riskScores || {}).map(([type, data]) => (
             <div key={type} className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 border border-gray-100">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -113,7 +114,7 @@ const RiskAssessment = () => {
                 <div className="flex justify-between text-sm text-gray-600 mb-2">
                   <span className="font-medium">Risk Score</span>
                   <span className={`font-bold text-lg ${getRiskScoreColor(data.score)}`}>
-                    {data.score.toFixed(0)}
+                    {data.score == null ? '—' : Number(data.score).toFixed(0)}
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
@@ -191,7 +192,7 @@ const RiskAssessment = () => {
             <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl">
               <div className="text-sm text-purple-600 font-medium mb-1">Risk Categories</div>
               <div className="text-lg font-bold text-purple-900">
-                {Object.keys(assessment.riskScores).length}
+                {Object.keys(assessment.riskScores || {}).length}
               </div>
             </div>
           </div>

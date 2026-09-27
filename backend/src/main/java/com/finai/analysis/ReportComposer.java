@@ -1,38 +1,25 @@
 package com.finai.analysis;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.finai.config.LlmRuntime;
 import com.finai.model.AnalysisTask;
 import com.finai.model.dto.AnalysisReportDTO;
 import com.finai.model.dto.AnomalySignalDTO;
 import com.finai.model.dto.FinancialMetricsDTO;
 import com.finai.model.dto.ValuationResultDTO;
-import com.finai.service.AuditLogService;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.ChatLanguageModel;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ReportComposer {
 
-    private final ChatLanguageModel chatLanguageModel;
-    private final AuditLogService auditLogService;
-    private final ObjectMapper objectMapper;
-
-    @Value("${finai.llm.model:qwen-plus}")
-    private String modelName;
+    private final SkillNarrator skillNarrator;
+    private final LlmRuntime llmRuntime;
 
     public AnalysisReportDTO compose(AnalysisTask task,
                                      StatementExtract extract,
@@ -41,7 +28,11 @@ public class ReportComposer {
                                      List<AnomalySignalDTO> anomalies,
                                      ValuationResultDTO valuation,
                                      long startedAtMs) {
-        Narrative narrative = narrative(task, metrics, checks, anomalies, valuation);
+        String growth = growthText(metrics);
+        String profit = profitText(metrics);
+        String cash = cashText(metrics, anomalies);
+        String overall = overallText(checks, anomalies, valuation);
+        SkillNarrator.Result narrative = skillNarrator.narrate(task, growth, profit, cash, overall, metrics, checks, anomalies, valuation, extract);
         List<AnalysisReportDTO.RiskFactor> risks = new ArrayList<>();
         for (AnomalySignalDTO anomaly : anomalies) {
             risks.add(AnalysisReportDTO.RiskFactor.builder()
@@ -91,12 +82,17 @@ public class ReportComposer {
                 .citations(citations)
                 .conclusion(conclusion)
                 .executionSummary(AnalysisReportDTO.ExecutionSummary.builder()
-                        .llmModel(narrative.llmUsed() ? modelName : "未调用")
-                        .llmCallCount(narrative.llmUsed() ? 1 : 0)
+                        .llmModel(narrative.llmCalls() > 0 ? llmRuntime.getModel() : "未调用")
+                        .llmCallCount(narrative.llmCalls())
+                        .temperature(llmRuntime.getTemperature())
+                        .leavesMachine(narrative.llmCalls() > 0 && llmRuntime.leavesMachine())
                         .executionTimeMs(System.currentTimeMillis() - startedAtMs)
                         .dataVersion(AnomalyRuleEngine.RULE_VERSION)
-                        .configVersion("field-dict-2026.1")
-                        .toolsUsed(List.of("pdf.parse", "metric.calculate", "articulation.check", "anomaly.rules", "valuation.dcf"))
+                        .configVersion(AnalysisConfig.get().configVersion())
+                        .promptVersion(narrative.promptVersion())
+                        .skillVersion(narrative.skillVersion())
+                        .fileSha256(extract.getSha256())
+                        .toolsUsed(List.of("file.access", "pdf.parse", "metric.calculate", "articulation.check", "anomaly.rules", "valuation.dcf"))
                         .generatedAt(LocalDateTime.now().toString())
                         .build())
                 .build();
@@ -117,46 +113,6 @@ public class ReportComposer {
         text.append(llmUsed ? "观点：质量分析里的模型段落需要人工复核。" : "观点：本次没有可用的模型表述。");
         text.append("以上不构成投资建议。");
         return text.toString();
-    }
-
-    private Narrative narrative(AnalysisTask task, FinancialMetricsDTO metrics, List<ArticulationCheck> checks,
-                                List<AnomalySignalDTO> anomalies, ValuationResultDTO valuation) {
-        String growth = growthText(metrics);
-        String profit = profitText(metrics);
-        String cash = cashText(metrics, anomalies);
-        String overall = overallText(checks, anomalies, valuation);
-        if ("DEMO01".equals(task.getCompanyCode())) {
-            return new Narrative(growth, profit, cash, overall, false);
-        }
-        String taskId = task.getTaskId();
-        String facts = growth + "\n" + profit + "\n" + cash + "\n" + overall;
-        long started = System.currentTimeMillis();
-        try {
-            String prompt = loadPrompt() + "\n\n已计算材料：\n" + facts;
-            String answer = chatLanguageModel.generate(UserMessage.from(prompt)).content().text();
-            auditLogService.logLLMRequest(taskId, modelName, truncate(prompt, 2000), truncate(answer, 2000),
-                    System.currentTimeMillis() - started);
-            if (answer == null || answer.contains("模拟的AI回复")) {
-                return new Narrative(growth, profit, cash, overall, false);
-            }
-            String json = answer.trim();
-            int start = json.indexOf('{');
-            int end = json.lastIndexOf('}');
-            if (start >= 0 && end > start) {
-                JsonNode node = objectMapper.readTree(json.substring(start, end + 1));
-                return new Narrative(
-                        textOr(node, "growth", growth),
-                        textOr(node, "profit", profit),
-                        textOr(node, "cash", cash),
-                        textOr(node, "overall", overall),
-                        true);
-            }
-            return new Narrative(growth, profit, cash, overall + " 观点（模型原文，未按 JSON 解析）：" + truncate(answer, 500), true);
-        } catch (Exception e) {
-            log.warn("Narrative model skipped: {}", e.getMessage());
-            auditLogService.logError(taskId, "LLM_CALL", e.getMessage());
-            return new Narrative(growth, profit, cash, overall, false);
-        }
     }
 
     private String growthText(FinancialMetricsDTO metrics) {
@@ -194,36 +150,10 @@ public class ReportComposer {
         return "事实：勾稽 " + check + "。异常 " + anomalies.size() + " 条。推论：" + range + "。";
     }
 
-    private String loadPrompt() {
-        try {
-            return new ClassPathResource("prompts/report-narrative.md").getContentAsString(StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            return "只根据给定数字写推论，不要新增数字。输出 JSON。";
-        }
-    }
-
-    private static String textOr(JsonNode node, String field, String fallback) {
-        JsonNode value = node.get(field);
-        if (value == null || value.asText().isBlank()) {
-            return fallback;
-        }
-        return value.asText();
-    }
-
     private static String pct(BigDecimal value) {
         if (value == null) {
             return "未提取";
         }
         return value.multiply(new BigDecimal("100")).setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() + "%";
-    }
-
-    private static String truncate(String value, int max) {
-        if (value == null || value.length() <= max) {
-            return value;
-        }
-        return value.substring(0, max);
-    }
-
-    private record Narrative(String growth, String profit, String cash, String overall, boolean llmUsed) {
     }
 }

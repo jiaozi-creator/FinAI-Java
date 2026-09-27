@@ -71,6 +71,9 @@ public class TaskExecutionWorker {
                     "lines=" + extract.getLines().size() + ",policyNotes=" + extract.getPolicyNotes().size(),
                     System.currentTimeMillis() - parseStart);
             evidenceStore.replace(task, extract);
+            auditLogService.logFileAccess(taskId, task.getUploadedFilePath(), extract.getSha256(),
+                    java.nio.file.Files.size(java.nio.file.Path.of(task.getUploadedFilePath())),
+                    extract.getPageCount() == null ? 0 : extract.getPageCount());
             if (stopped(taskId)) {
                 return;
             }

@@ -207,9 +207,8 @@ public class SmartPDFParserServiceImpl implements SmartPDFParserService {
         // 可以使用 Tesseract OCR 或云端 OCR 服务
 
         return PDFParseResultDTO.TableData.builder()
-                .tableId(UUID.randomUUID().toString())
-                .title("OCR识别的表格")
-                .confidence(0.75)
+                .title("未实现")
+                .confidence(null)
                 .build();
     }
 

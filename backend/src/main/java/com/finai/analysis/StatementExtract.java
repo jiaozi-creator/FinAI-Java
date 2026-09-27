@@ -10,4 +10,7 @@ import java.util.List;
 public class StatementExtract {
     List<ExtractedLine> lines;
     List<PolicyNote> policyNotes;
+    String sourcePath;
+    String sha256;
+    Integer pageCount;
 }

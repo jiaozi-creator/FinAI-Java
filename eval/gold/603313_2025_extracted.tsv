@@ -1,0 +1,25 @@
+lines=24 pages=237 sha256=dec798723b1b312107ec8bc817a1a0c274175d7de4c545906c83116c1625c5fc
+revenue	营业收入	8912075395.97	8449386211.83	元	consolidated	98
+net_profit_deducted	扣非净利润	-39312271.78	-279702121.97	元	summary	8
+total_assets	资产总计	9627422735.04	9622769572.52	元	consolidated	95
+basic_eps	基本每股收益	-0.02	-0.27	元	consolidated	100
+nri_disposal	资产处置损益	-1061455.20	15818094.82	元	summary	9
+nri_other	其他营业外收支	532423.62	127997988.64	元	summary	10
+nri_tax	所得税影响额	5895855.96	22920097.73	元	summary	10
+nri_minority_impact	少数股东权益影响额	577810.50	68977.82	元	summary	10
+nri_total	非经常性损益合计	29489773.83	128281797.57	元	summary	10
+net_profit	归母净利润	-9822497.95	-151420324.40	元	consolidated	99
+operating_cost	营业成本	5411680257.63	5335596220.13	元	consolidated	98
+operating_cash_flow	经营活动现金流	883073254.93	963903027.07	元	consolidated	102
+long_term_debt	长期借款	238452244.41	96881159.17	元	consolidated	95
+cash	货币资金	1088855303.96	1006282974.26	元	consolidated	94
+accounts_receivable	应收账款	1457824703.59	1467319534.59	元	consolidated	94
+inventory	存货	1781225167.08	1643949298.23	元	consolidated	94
+current_assets	流动资产合计	4615958340.65	4422880344.53	元	consolidated	94
+goodwill	商誉	209879659.10	244584973.52	元	consolidated	94
+short_term_debt	短期借款	1833769447.36	1833739313.41	元	consolidated	95
+current_liabilities	流动负债合计	4496468462.34	4366176685.31	元	consolidated	95
+total_liabilities	负债合计	6086960046.31	5936747650.29	元	consolidated	95
+net_assets	归母权益	3499230196.18	3628152636.36	元	consolidated	96
+minority_interest	少数股东权益	41232492.55	57869285.87	元	consolidated	96
+capex	资本开支	386253464.20	379334307.74	元	consolidated	102
