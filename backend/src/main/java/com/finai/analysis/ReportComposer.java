@@ -30,7 +30,7 @@ public class ReportComposer {
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
 
-    @Value("${finai.llm.model:qwen-plus}")
+    @Value("${finai.llm.model:qwen3.7-flash}")
     private String modelName;
 
     public AnalysisReportDTO compose(AnalysisTask task,

@@ -10,7 +10,7 @@ class LangChain4jConfigTest {
     private LangChain4jConfig config(String provider) {
         LangChain4jConfig config = new LangChain4jConfig();
         ReflectionTestUtils.setField(config, "llmProvider", provider);
-        ReflectionTestUtils.setField(config, "model", "qwen-plus");
+        ReflectionTestUtils.setField(config, "model", "qwen3.7-flash");
         ReflectionTestUtils.setField(config, "aliyunBaseUrl", "https://dashscope.aliyuncs.com/compatible-mode/v1");
         ReflectionTestUtils.setField(config, "aliyunApiKey", "test-key");
         ReflectionTestUtils.setField(config, "maxTokens", 100);
@@ -49,5 +49,18 @@ class LangChain4jConfigTest {
         assertThat(config.chatLanguageModel()).isNotNull();
         ReflectionTestUtils.setField(config, "aliyunBaseUrl", "https://example.com/v1");
         assertThatThrownBy(config::chatLanguageModel).hasMessageContaining("official Aliyun endpoint");
+    }
+
+    @Test
+    void acceptsAliyunQwen3NamingAndRejectsMultimodal() {
+        assertThat(LangChain4jConfig.isAllowedCompetitionQwenModel("qwen3.7-flash")).isTrue();
+        assertThat(LangChain4jConfig.isAllowedCompetitionQwenModel("qwen3.8-max")).isTrue();
+        assertThat(LangChain4jConfig.isAllowedCompetitionQwenModel("qwen-plus")).isTrue();
+        assertThat(LangChain4jConfig.isAllowedCompetitionQwenModel("qwen3.8-omni-flash")).isFalse();
+        assertThat(LangChain4jConfig.isAllowedCompetitionQwenModel("claude-3-sonnet-20240229")).isFalse();
+
+        LangChain4jConfig config = config("aliyun");
+        ReflectionTestUtils.setField(config, "model", "qwen3.8-omni-flash");
+        assertThatThrownBy(config::chatLanguageModel).hasMessageContaining("allowedQwen=false");
     }
 }

@@ -31,13 +31,17 @@ copy .env.example .env
 notepad .env
 ```
 
-竞赛模式填入阿里云密钥：
+竞赛模式填入阿里云密钥，并使用文本聊天模型名（以控制台为准）：
 ```
 LLM_PROVIDER=aliyun
 ALIYUN_API_KEY=你的阿里云密钥
+LLM_MODEL=qwen3.7-flash
+COMPETITION_MODE=true
 ```
 
-无密钥离线演示必须显式设置 `LLM_PROVIDER=mock` 和 `DEV_MOCK_LLM=true`；竞赛模式不允许 Mock。
+亦可选用 `qwen3.8-max` 等通义文本聊天模型；不要填 omni/realtime 等多模态名。
+
+无密钥离线演示必须显式设置 `LLM_PROVIDER=mock` 和 `DEV_MOCK_LLM=true`，并设 `COMPETITION_MODE=false`；竞赛模式不允许 Mock。
 
 ### 2. 一键启动
 

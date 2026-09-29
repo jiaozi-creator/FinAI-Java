@@ -58,7 +58,7 @@ finai:
   # LLM Configuration
   llm:
     provider: ${LLM_PROVIDER:aliyun}
-    model: ${LLM_MODEL:qwen-plus}
+    model: ${LLM_MODEL:qwen3.7-flash}
     temperature: ${LLM_TEMPERATURE:0.0}
     max-tokens: ${LLM_MAX_TOKENS:4096}
     timeout: ${LLM_TIMEOUT:60000}

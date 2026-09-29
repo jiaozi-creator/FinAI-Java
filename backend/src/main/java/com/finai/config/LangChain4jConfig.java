@@ -31,7 +31,7 @@ public class LangChain4jConfig {
     @Value("${finai.llm.aliyun.base-url:}")
     private String aliyunBaseUrl;
 
-    @Value("${finai.llm.model:qwen-plus}")
+    @Value("${finai.llm.model:qwen3.7-flash}")
     private String model;
 
     @Value("${finai.llm.temperature:0.0}")
@@ -52,6 +52,9 @@ public class LangChain4jConfig {
     @Bean
     public ChatLanguageModel chatLanguageModel() {
         log.info("Initializing ChatLanguageModel with provider: {}", llmProvider);
+        boolean allowedQwen = isAllowedCompetitionQwenModel(model);
+        boolean baseUrlOfficial = aliyunBaseUrl == null || aliyunBaseUrl.isBlank()
+                || "https://dashscope.aliyuncs.com/compatible-mode/v1".equals(aliyunBaseUrl);
 
         if ("mock".equalsIgnoreCase(llmProvider)) {
             if (!mockEnabled) {
@@ -68,13 +71,15 @@ public class LangChain4jConfig {
 
         if ("aliyun".equalsIgnoreCase(llmProvider)) {
             requireKey(aliyunApiKey, "ALIYUN_API_KEY");
-            if (competitionMode && (!model.toLowerCase(java.util.Locale.ROOT).startsWith("qwen-")
-                    || (!aliyunBaseUrl.isBlank() && !"https://dashscope.aliyuncs.com/compatible-mode/v1".equals(aliyunBaseUrl)))) {
-                throw new IllegalStateException("Competition mode requires a Qwen model on the official Aliyun endpoint");
+            // 修正：兼容阿里云新命名 qwen3.7-flash / qwen3.8-max，不再只认 qwen- 前缀
+            if (competitionMode && (!allowedQwen || !baseUrlOfficial)) {
+                throw new IllegalStateException(
+                        "Competition mode requires a Qwen text chat model on the official Aliyun endpoint"
+                                + " (LLM_MODEL=" + model + ", allowedQwen=" + allowedQwen
+                                + ", baseUrlOfficial=" + baseUrlOfficial + ")");
             }
 
-            log.info("Using Aliyun Qwen model");
-            // Use OpenAI-compatible API for Aliyun
+            log.info("Using Aliyun Qwen model: {}", model);
             return OpenAiChatModel.builder()
                     .apiKey(aliyunApiKey)
                     .baseUrl(aliyunBaseUrl.isEmpty() ? "https://dashscope.aliyuncs.com/compatible-mode/v1" : aliyunBaseUrl)
@@ -114,6 +119,23 @@ public class LangChain4jConfig {
         if (key == null || key.isBlank() || key.startsWith("your_")) {
             throw new IllegalStateException("Missing model API key: " + variable);
         }
+    }
+
+    /**
+     * 竞赛模式允许的通义文本聊天模型命名：
+     * - 旧名：qwen-plus / qwen-turbo / qwen-max
+     * - 新名：qwen3.7-flash / qwen3.8-max 等（以 qwen + 数字 开头）
+     * 多模态/实时（omni、realtime、vl、mt-uni）不纳入当前文本 ChatLanguageModel 主链路。
+     */
+    static boolean isAllowedCompetitionQwenModel(String modelName) {
+        if (modelName == null || modelName.isBlank()) {
+            return false;
+        }
+        String m = modelName.toLowerCase(java.util.Locale.ROOT).trim();
+        if (m.contains("omni") || m.contains("realtime") || m.contains("-vl") || m.contains("mt-uni")) {
+            return false;
+        }
+        return m.startsWith("qwen-") || m.matches("^qwen\\d.*");
     }
 
     /**
