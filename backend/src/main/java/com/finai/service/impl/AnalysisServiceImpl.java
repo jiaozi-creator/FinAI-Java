@@ -12,6 +12,7 @@ import com.finai.repository.EvidenceRepository;
 import com.finai.service.AnalysisService;
 import com.finai.service.AuditLogService;
 import com.finai.service.TaskExecutionWorker;
+import com.finai.agent.TaskOrchestrator;
 import com.finai.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,11 +49,23 @@ public class AnalysisServiceImpl implements AnalysisService {
     private final AuditLogService auditLogService;
     private final TaskExecutionWorker taskExecutionWorker;
     private final ObjectMapper objectMapper;
+    private final TaskOrchestrator orchestrator;
 
     @Override
     @Transactional
     public TaskResponseDTO createTask(TaskRequestDTO request, MultipartFile file) {
         log.info("Creating analysis task for company: {}", request.getCompanyCode());
+
+        if (file == null || file.isEmpty() || file.getSize() > 50L * 1024 * 1024) {
+            throw new IllegalArgumentException("请上传不超过 50MB 的 PDF 财报");
+        }
+        try (java.io.InputStream input = file.getInputStream()) {
+            if (!java.util.Arrays.equals(input.readNBytes(5), "%PDF-".getBytes(java.nio.charset.StandardCharsets.US_ASCII))) {
+                throw new IllegalArgumentException("文件内容不是 PDF");
+            }
+        } catch (IOException e) {
+            throw new IllegalArgumentException("无法读取上传的 PDF", e);
+        }
 
         // 生成任务ID
         String taskId = "TASK_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
@@ -167,7 +180,7 @@ public class AnalysisServiceImpl implements AnalysisService {
     @Override
     @Transactional
     public void cancelTask(String taskId) {
-        AnalysisTask task = taskRepository.findById(taskId)
+        AnalysisTask task = taskRepository.findLocked(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskId));
 
         if (task.getStatus() == AnalysisTask.TaskStatus.RUNNING ||
@@ -184,13 +197,18 @@ public class AnalysisServiceImpl implements AnalysisService {
     @Override
     @Transactional
     public void deleteTask(String taskId) {
-        AnalysisTask task = taskRepository.findById(taskId)
+        AnalysisTask task = taskRepository.findLocked(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskId));
+
+        if (task.getStatus() == AnalysisTask.TaskStatus.RUNNING || task.getStatus() == AnalysisTask.TaskStatus.QUEUED) {
+            throw new IllegalStateException("Cancel the running task before deletion");
+        }
 
         // 删除相关证据
         evidenceRepository.deleteByTaskId(taskId);
 
         snapshotRepository.deleteByTaskId(taskId);
+        orchestrator.delete(taskId);
         taskRepository.delete(task);
 
         auditLogService.logTaskDeletion(taskId);
@@ -198,8 +216,26 @@ public class AnalysisServiceImpl implements AnalysisService {
     }
 
     @Override
+    @Transactional
     public void executeTask(String taskId) {
-        taskExecutionWorker.execute(taskId);
+        AnalysisTask task = taskRepository.findLocked(taskId)
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskId));
+        if (task.getStatus() == AnalysisTask.TaskStatus.RUNNING || task.getStatus() == AnalysisTask.TaskStatus.QUEUED) {
+            throw new IllegalStateException("Task is already running");
+        }
+        if (task.getUploadedFilePath() == null || !Files.isRegularFile(Path.of(task.getUploadedFilePath()))) {
+            throw new IllegalStateException("Uploaded statement is missing");
+        }
+        task.setStatus(AnalysisTask.TaskStatus.QUEUED);
+        task.setProgress(0);
+        task.setErrorMessage(null);
+        taskRepository.save(task);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                taskExecutionWorker.execute(taskId);
+            }
+        });
     }
 
     private LoadedSnapshot readSnapshot(String taskId) {
@@ -235,10 +271,10 @@ public class AnalysisServiceImpl implements AnalysisService {
         Files.createDirectories(uploadDir);
 
         String originalFilename = file.getOriginalFilename();
-        String extension = originalFilename != null && originalFilename.contains(".")
-                ? originalFilename.substring(originalFilename.lastIndexOf("."))
-                : ".pdf";
-        String filename = taskId + extension;
+        if (originalFilename == null || !originalFilename.toLowerCase(java.util.Locale.ROOT).endsWith(".pdf")) {
+            throw new IllegalArgumentException("仅支持 PDF 文件");
+        }
+        String filename = taskId + ".pdf";
 
         Path filepath = uploadDir.resolve(filename);
         file.transferTo(filepath);

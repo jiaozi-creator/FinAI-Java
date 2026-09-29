@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { AlertTriangle, TrendingUp, Shield, Activity, AlertCircle, CheckCircle } from 'lucide-react';
-import axios from 'axios';
+import api from '../services/api';
 
 const RiskAssessment = () => {
   const { taskId } = useParams();
   const [assessment, setAssessment] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  const API_BASE = 'http://localhost:8080/api';
 
   useEffect(() => {
     loadRiskAssessment();
@@ -17,8 +15,8 @@ const RiskAssessment = () => {
   const loadRiskAssessment = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE}/risks/${taskId}/assessment`);
-      setAssessment(response.data);
+      const response = await api.get(`/risks/${taskId}/assessment`);
+      setAssessment(response);
     } catch (error) {
       console.error('Failed to load risk assessment:', error);
     } finally {
@@ -58,7 +56,7 @@ const RiskAssessment = () => {
       <div className="flex items-center justify-center h-screen bg-gradient-to-br from-gray-50 to-red-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-red-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Analyzing risks...</p>
+          <p className="text-gray-600 font-medium">正在获取风险状态...</p>
         </div>
       </div>
     );
@@ -67,8 +65,22 @@ const RiskAssessment = () => {
   if (!assessment) {
     return (
       <div className="flex items-center justify-center h-screen bg-gradient-to-br from-gray-50 to-red-50">
-        <p className="text-gray-600">No risk assessment data available</p>
+        <p className="text-gray-600">无法获取风险状态，请核对任务状态。</p>
       </div>
+    );
+  }
+
+  if (assessment.overallRiskScore == null) {
+    return (
+      <main className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-2xl font-semibold mb-4">风险评估</h1>
+          <div role="status" className="bg-white border border-gray-200 rounded p-6">
+            <p className="font-semibold text-gray-900">尚未评估</p>
+            <p className="text-gray-700 mt-2">{assessment.summary}</p>
+          </div>
+        </div>
+      </main>
     );
   }
 
@@ -179,7 +191,7 @@ const RiskAssessment = () => {
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl">
               <div className="text-sm text-blue-600 font-medium mb-1">Generated At</div>
               <div className="text-lg font-bold text-blue-900">
-                {new Date(assessment.generatedAt).toLocaleString()}
+                {new Date(assessment.assessedAt).toLocaleString()}
               </div>
             </div>
             <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl">

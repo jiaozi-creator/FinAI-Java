@@ -13,16 +13,16 @@ FinAI 是一个基于大语言模型的金融投研智能体系统，旨在为�
 
 - ✅ **财务报告分析**: 自动提取和分析上市公司财务数据
 - ✅ **异常信号检测**: 基于规则引擎检测财务异常
-- ✅ **自动化估值**: DCF、相对估值、历史分位等多维度估值
+- ✅ **自动化估值**: 基于财报输入和显式假设的 DCF；相对估值在有可靠可比数据后再启用
 - ✅ **证据溯源管理**: 完整记录所有数据来源和计算过程
-- ✅ **智能体编排**: 支持多智能体协同工作
+- 🚧 **智能体编排**: 当前为固定 Java 执行链；受控多角色编排列入 P1
 - ✅ **审计日志**: 所有操作可追溯、可复现
 
 ### 技术特点
 
 - 🚀 **现代化架构**: Spring Boot 3 + React 18
-- 🤖 **AI 驱动**: 集成 LangChain4j，支持 Claude、GPT 等多种模型
-- 📊 **数据处理**: PDF 解析、表格提取、OCR 识别
+- 🤖 **AI 驱动**: 竞赛默认使用阿里云 Qwen；Claude/OpenAI 仅保留为非竞赛开发适配器
+- 📊 **数据处理**: 当前主链路为 PDFBox 文本抽取；扫描件 OCR 和复杂表格仍待评估
 - 🔍 **规则引擎**: YAML 配置化的异常检测规则
 - 💾 **灵活存储**: 支持 H2、MySQL、PostgreSQL
 - 📈 **可视化**: Ant Design + Recharts 图表展示
@@ -98,13 +98,13 @@ cp .env.example .env
 
 至少需要配置以下内容:
 ```bash
-# 选择 LLM 提供商
-LLM_PROVIDER=claude  # 或 openai
+# 竞赛默认使用阿里云 Qwen
+LLM_PROVIDER=aliyun
+ALIYUN_API_KEY=your_aliyun_api_key_here
 
-# API 密钥
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-# 或
-OPENAI_API_KEY=your_openai_api_key_here
+# 无密钥离线演示（必须显式开启）
+# LLM_PROVIDER=mock
+# DEV_MOCK_LLM=true
 ```
 
 3. **一键启动**
@@ -125,7 +125,7 @@ run_all.bat
 - 前端: http://localhost:5173
 - 后端API: http://localhost:8080
 - API文档: http://localhost:8080/swagger-ui.html
-- H2控制台: http://localhost:8080/h2-console
+- H2 控制台默认关闭；仅在本地显式设置 `H2_CONSOLE_ENABLED=true` 时开放
 
 ### 手动启动
 

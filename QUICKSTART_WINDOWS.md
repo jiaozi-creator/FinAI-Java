@@ -6,7 +6,7 @@
 
 ### 必需软件
 
-1. **Java 17+** 
+1. **Java 17+（JDK 25 也可直接使用）** 
    - 下载地址: https://adoptium.net/
    - 安装后验证: `java -version`
 
@@ -31,11 +31,13 @@ copy .env.example .env
 notepad .env
 ```
 
-填入你的API密钥：
+竞赛模式填入阿里云密钥：
 ```
-LLM_PROVIDER=claude
-ANTHROPIC_API_KEY=你的密钥
+LLM_PROVIDER=aliyun
+ALIYUN_API_KEY=你的阿里云密钥
 ```
+
+无密钥离线演示必须显式设置 `LLM_PROVIDER=mock` 和 `DEV_MOCK_LLM=true`；竞赛模式不允许 Mock。
 
 ### 2. 一键启动
 
@@ -86,7 +88,7 @@ taskkill /PID 进程ID /F
 ```
 
 ### Java版本不对
-确保安装了JDK 17或更高版本，并设置了JAVA_HOME环境变量。
+确保使用JDK 17或更高版本；当前项目环境使用JDK 25，无需降级到JDK 17，并设置好JAVA_HOME。
 
 ### Maven构建失败
 ```cmd

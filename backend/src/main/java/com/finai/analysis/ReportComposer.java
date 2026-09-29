@@ -1,6 +1,5 @@
 package com.finai.analysis;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finai.model.AnalysisTask;
 import com.finai.model.dto.AnalysisReportDTO;
@@ -134,7 +133,7 @@ public class ReportComposer {
         try {
             String prompt = loadPrompt() + "\n\n已计算材料：\n" + facts;
             String answer = chatLanguageModel.generate(UserMessage.from(prompt)).content().text();
-            auditLogService.logLLMRequest(taskId, modelName, truncate(prompt, 2000), truncate(answer, 2000),
+            auditLogService.logLLMRequest(taskId, modelName, prompt, answer,
                     System.currentTimeMillis() - started);
             if (answer == null || answer.contains("模拟的AI回复")) {
                 return new Narrative(growth, profit, cash, overall, false);
@@ -143,19 +142,16 @@ public class ReportComposer {
             int start = json.indexOf('{');
             int end = json.lastIndexOf('}');
             if (start >= 0 && end > start) {
-                JsonNode node = objectMapper.readTree(json.substring(start, end + 1));
-                return new Narrative(
-                        textOr(node, "growth", growth),
-                        textOr(node, "profit", profit),
-                        textOr(node, "cash", cash),
-                        textOr(node, "overall", overall),
-                        true);
+                objectMapper.readTree(json.substring(start, end + 1));
+                // 模型表述未经证据复核，不覆盖确定性计算结果。
+                return new Narrative(growth, profit, cash,
+                        overall + " 模型建议已生成，但未经证据复核，未纳入正式结论。", true);
             }
-            return new Narrative(growth, profit, cash, overall + " 观点（模型原文，未按 JSON 解析）：" + truncate(answer, 500), true);
+            return new Narrative(growth, profit, cash, overall + " 模型回复格式无效，已使用程序报告（降级）。", false);
         } catch (Exception e) {
-            log.warn("Narrative model skipped: {}", e.getMessage());
-            auditLogService.logError(taskId, "LLM_CALL", e.getMessage());
-            return new Narrative(growth, profit, cash, overall, false);
+            log.warn("Narrative model unavailable: {}", e.getClass().getSimpleName());
+            auditLogService.logError(taskId, "LLM_CALL", e.getClass().getSimpleName());
+            return new Narrative(growth, profit, cash, overall + " 模型不可用，已使用程序报告（降级）。", false);
         }
     }
 
@@ -200,14 +196,6 @@ public class ReportComposer {
         } catch (Exception e) {
             return "只根据给定数字写推论，不要新增数字。输出 JSON。";
         }
-    }
-
-    private static String textOr(JsonNode node, String field, String fallback) {
-        JsonNode value = node.get(field);
-        if (value == null || value.asText().isBlank()) {
-            return fallback;
-        }
-        return value.asText();
     }
 
     private static String pct(BigDecimal value) {

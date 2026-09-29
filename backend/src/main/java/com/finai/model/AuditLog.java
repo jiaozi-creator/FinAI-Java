@@ -20,9 +20,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Entity
 @Table(name = "audit_log", indexes = {
-    @Index(name = "idx_task_id", columnList = "task_id"),
-    @Index(name = "idx_log_type", columnList = "log_type"),
-    @Index(name = "idx_created_at", columnList = "created_at")
+    @Index(name = "idx_audit_task_id", columnList = "task_id"),
+    @Index(name = "idx_audit_log_type", columnList = "log_type"),
+    @Index(name = "idx_audit_created_at", columnList = "created_at")
 })
 public class AuditLog {
 
@@ -52,19 +52,22 @@ public class AuditLog {
     /**
      * 详细信息
      */
-    @Column(name = "details", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "details")
     private String details;
 
     /**
      * 输入参数 (JSON)
      */
-    @Column(name = "input_params", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "input_params")
     private String inputParams;
 
     /**
      * 输出结果 (JSON)
      */
-    @Column(name = "output_result", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "output_result")
     private String outputResult;
 
     /**

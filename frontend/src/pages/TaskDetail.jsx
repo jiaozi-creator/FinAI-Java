@@ -39,6 +39,8 @@ function TaskDetail() {
   const [valuation, setValuation] = useState(null)
   const [evidence, setEvidence] = useState([])
   const [auditLogs, setAuditLogs] = useState([])
+  const [executionRun, setExecutionRun] = useState(null)
+  const [executionStages, setExecutionStages] = useState([])
   const [resultNote, setResultNote] = useState('')
   const statusRef = useRef(null)
 
@@ -56,6 +58,12 @@ function TaskDetail() {
         if (cancelled) return
         setTask(taskData)
         statusRef.current = taskData.status
+        const runData = await taskAPI.getRuns(taskId).catch(() => [])
+        const latestRun = runData?.[0] || null
+        setExecutionRun(latestRun)
+        setExecutionStages(latestRun
+          ? await taskAPI.getStages(taskId, latestRun.id).catch(() => [])
+          : [])
         if (taskData.status === 'COMPLETED') {
           const [metricsData, anomaliesData, valuationData, evidenceData, auditData] = await Promise.all([
             taskAPI.getMetrics(taskId).catch((error) => ({ __error: error })),
@@ -268,6 +276,31 @@ function TaskDetail() {
           <Alert style={{ marginTop: 24 }} type="error" message="任务失败" description={task.errorMessage} />
         )}
       </Card>
+
+      {executionRun && (
+        <Card title="执行阶段" style={{ marginTop: 16 }}>
+          <Descriptions bordered column={2} size="small">
+            <Descriptions.Item label="运行标识">{executionRun.id}</Descriptions.Item>
+            <Descriptions.Item label="输入哈希">{executionRun.inputSha256}</Descriptions.Item>
+            <Descriptions.Item label="运行状态">{executionRun.status}</Descriptions.Item>
+            <Descriptions.Item label="当前阶段">{executionRun.currentStage || '-'}</Descriptions.Item>
+          </Descriptions>
+          <Table
+            style={{ marginTop: 16 }}
+            size="small"
+            pagination={false}
+            rowKey="id"
+            dataSource={executionStages}
+            columns={[
+              { title: '阶段', dataIndex: 'name' },
+              { title: '状态', dataIndex: 'status', render: (value) => getStatusTag(value) },
+              { title: '开始', dataIndex: 'startedAt', render: (value) => value ? new Date(value).toLocaleString() : '-' },
+              { title: '结束', dataIndex: 'finishedAt', render: (value) => value ? new Date(value).toLocaleString() : '-' },
+              { title: '错误码', dataIndex: 'errorCode', render: (value) => value || '-' },
+            ]}
+          />
+        </Card>
+      )}
 
       {task.status === 'COMPLETED' && resultNote && (
         <Alert style={{ marginTop: 16 }} type="warning" showIcon message="还没有可展示的计算结果" description={resultNote} />

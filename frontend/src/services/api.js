@@ -49,6 +49,10 @@ export const taskAPI = {
     return api.get(`/tasks/${taskId}`)
   },
 
+  getRuns: (taskId) => api.get(`/tasks/${taskId}/runs`),
+
+  getStages: (taskId, runId) => api.get(`/tasks/${taskId}/runs/${runId}/stages`),
+
   // 获取任务列表
   listTasks: (params) => {
     return api.get('/tasks', { params })

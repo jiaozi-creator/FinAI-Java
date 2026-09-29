@@ -4,7 +4,7 @@
 
 在Windows上运行FinAI项目，需要先安装以下软件：
 
-### 1. 安装 JDK 17+
+### 1. 准备 JDK 17+
 
 **方法一：使用 Oracle JDK**
 1. 访问 https://www.oracle.com/java/technologies/downloads/#java17
@@ -62,18 +62,16 @@ npm --version
 ### 第一步：配置环境变量
 
 1. 在项目根目录，复制 `.env.example` 为 `.env`
-2. 编辑 `.env` 文件，填入你的 API 密钥：
+2. 竞赛模式编辑 `.env`，填入阿里云 API 密钥：
 
 ```bash
-# 选择 LLM 提供商
-LLM_PROVIDER=claude
+# 选择国产模型提供商
+LLM_PROVIDER=aliyun
+ALIYUN_API_KEY=your_aliyun_api_key_here
 
-# 填入你的 API 密钥
-ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxx
-
-# 或者使用 OpenAI
-# LLM_PROVIDER=openai
-# OPENAI_API_KEY=sk-xxxxxxxxxxxxx
+# 无密钥离线演示（非竞赛模式）
+# LLM_PROVIDER=mock
+# DEV_MOCK_LLM=true
 ```
 
 ### 第二步：一键启动
@@ -107,7 +105,7 @@ run_all.bat
 - **前端界面**: http://localhost:5173
 - **后端API**: http://localhost:8080
 - **API文档**: http://localhost:8080/swagger-ui.html
-- **H2数据库控制台**: http://localhost:8080/h2-console
+- H2 数据库控制台默认关闭；仅本地显式设置 `H2_CONSOLE_ENABLED=true` 时开放
 
 ## 手动启动（如果一键脚本失败）
 
@@ -186,7 +184,7 @@ npm install
 # 检查Java版本
 java -version
 
-# 如果版本低于17，需要重新安装JDK 17+
+# 只有版本低于17才需要升级；JDK 25可直接运行本项目
 ```
 
 ### 问题5：JAVA_HOME未设置

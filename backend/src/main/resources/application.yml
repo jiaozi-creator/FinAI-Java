@@ -27,7 +27,7 @@ spring:
 
   h2:
     console:
-      enabled: true
+      enabled: ${H2_CONSOLE_ENABLED:false}
       path: /h2-console
 
   servlet:
@@ -46,19 +46,19 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
-  address: ${SERVER_HOST:0.0.0.0}
+  address: ${SERVER_HOST:127.0.0.1}
   compression:
     enabled: true
   error:
-    include-message: always
-    include-binding-errors: always
+    include-message: never
+    include-binding-errors: never
 
 # Custom Application Configuration
 finai:
   # LLM Configuration
   llm:
     provider: ${LLM_PROVIDER:aliyun}
-    model: ${LLM_MODEL:claude-3-sonnet-20240229}
+    model: ${LLM_MODEL:qwen-plus}
     temperature: ${LLM_TEMPERATURE:0.0}
     max-tokens: ${LLM_MAX_TOKENS:4096}
     timeout: ${LLM_TIMEOUT:60000}
@@ -130,7 +130,10 @@ finai:
   dev:
     mode: ${DEV_MODE:true}
     mock-llm: ${DEV_MOCK_LLM:false}
+    demo-enabled: ${DEV_DEMO_ENABLED:false}
     skip-auth: ${DEV_SKIP_AUTH:true}
+
+  competition-mode: ${COMPETITION_MODE:true}
 
 # Logging Configuration
 logging:
@@ -139,7 +142,7 @@ logging:
     com.finai: DEBUG
     org.springframework.web: INFO
     org.hibernate: WARN
-    dev.langchain4j: DEBUG
+    dev.langchain4j: INFO
   file:
     name: ${LOG_FILE_PATH:./logs/finai.log}
   pattern:

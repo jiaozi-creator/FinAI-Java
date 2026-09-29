@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -17,6 +18,10 @@ import java.util.Optional;
  */
 @Repository
 public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, String> {
+
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM AnalysisTask t WHERE t.taskId = :taskId")
+    Optional<AnalysisTask> findLocked(@Param("taskId") String taskId);
 
     /**
      * 根据公司代码查询任务

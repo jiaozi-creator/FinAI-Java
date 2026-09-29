@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
@@ -35,7 +36,13 @@ public class DemoTaskService {
     private final TaskExecutionWorker taskExecutionWorker;
     private final AuditLogService auditLogService;
 
+    @Value("${finai.dev.demo-enabled:false}")
+    private boolean demoEnabled;
+
     public TaskResponseDTO open() {
+        if (!demoEnabled) {
+            throw new IllegalStateException("内置样例仅在 DEV_DEMO_ENABLED=true 时可用");
+        }
         if (isReady()) {
             return TaskResponseDTO.fromEntity(taskRepository.findById(TASK_ID).orElseThrow());
         }
@@ -97,8 +104,14 @@ public class DemoTaskService {
     static class SeedOnStartup implements CommandLineRunner {
         private final DemoTaskService demoTaskService;
 
+        @Value("${finai.dev.demo-enabled:false}")
+        private boolean demoEnabled;
+
         @Override
         public void run(String... args) {
+            if (!demoEnabled) {
+                return;
+            }
             try {
                 demoTaskService.open();
                 log.info("Demo task ready: {}", TASK_ID);

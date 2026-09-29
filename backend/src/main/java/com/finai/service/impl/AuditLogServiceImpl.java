@@ -74,7 +74,7 @@ public class AuditLogServiceImpl implements AuditLogService {
                     .operation("TASK_EXECUTION")
                     .details("Task execution failed")
                     .status("ERROR")
-                    .errorMessage(exception.getMessage())
+                    .errorMessage(exception.getClass().getSimpleName())
                     .createdAt(LocalDateTime.now())
                     .build();
             auditLogRepository.save(auditLog);
@@ -128,8 +128,8 @@ public class AuditLogServiceImpl implements AuditLogService {
                     .logType(AuditLog.LogType.TOOL_INVOCATION)
                     .operation(toolName)
                     .details("Tool invoked")
-                    .inputParams(input)
-                    .outputResult(output)
+                    .inputParams(fingerprint(input))
+                    .outputResult(fingerprint(output))
                     .status("SUCCESS")
                     .executionTimeMs(executionTime)
                     .createdAt(LocalDateTime.now())
@@ -148,9 +148,9 @@ public class AuditLogServiceImpl implements AuditLogService {
                     .taskId(taskId)
                     .logType(AuditLog.LogType.LLM_REQUEST)
                     .operation("LLM_CALL")
-                    .details("LLM request: " + model)
-                    .inputParams(truncate(prompt, 2000))
-                    .outputResult(truncate(response, 2000))
+                    .details("LLM request")
+                    .inputParams(fingerprint(prompt))
+                    .outputResult(fingerprint(response))
                     .status("SUCCESS")
                     .executionTimeMs(executionTime)
                     .version(model)
@@ -172,7 +172,7 @@ public class AuditLogServiceImpl implements AuditLogService {
                     .operation(operation)
                     .details("Error occurred")
                     .status("ERROR")
-                    .errorMessage(errorMessage)
+                    .errorMessage("Details withheld; inspect sanitized application diagnostics")
                     .createdAt(LocalDateTime.now())
                     .build();
             auditLogRepository.save(auditLog);
@@ -220,10 +220,16 @@ public class AuditLogServiceImpl implements AuditLogService {
     /**
      * 截断长文本
      */
-    private String truncate(String text, int maxLength) {
+    private String fingerprint(String text) {
         if (text == null) {
             return null;
         }
-        return text.length() <= maxLength ? text : text.substring(0, maxLength) + "...";
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return "sha256:" + java.util.HexFormat.of().formatHex(digest);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
     }
 }

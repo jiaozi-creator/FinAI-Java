@@ -60,8 +60,8 @@ public class RiskWarningServiceImpl implements RiskWarningService {
         Map<RiskAlertDTO.RiskType, RiskAssessmentDTO.RiskScore> riskScores = calculateRiskScores(alerts);
 
         // 计算综合风险评分
-        double overallScore = calculateOverallRiskScore(riskScores);
-        RiskAlertDTO.RiskLevel overallLevel = getRiskLevel(overallScore);
+        Double overallScore = null;
+        RiskAlertDTO.RiskLevel overallLevel = null;
 
         // 识别高风险领域
         List<String> highRiskAreas = identifyHighRiskAreas(riskScores);
@@ -80,7 +80,7 @@ public class RiskWarningServiceImpl implements RiskWarningService {
                 .alerts(alerts)
                 .highRiskAreas(highRiskAreas)
                 .riskTrend("未计算")
-                .summary(generateSummary(overallLevel, highRiskAreas))
+                .summary("风险分类评估尚未实现；空预警不代表风险低。请查阅任务报告中的已触发异常规则。")
                 .recommendations(recommendations)
                 .assessedAt(LocalDateTime.now())
                 .build();
@@ -130,10 +130,7 @@ public class RiskWarningServiceImpl implements RiskWarningService {
 
             if (typeAlerts.isEmpty()) {
                 scores.put(riskType, RiskAssessmentDTO.RiskScore.builder()
-                        .score(0.0)
-                        .level(RiskAlertDTO.RiskLevel.LOW)
-                        .weight(getTypeWeight(riskType))
-                        .keyIssues(new ArrayList<>())
+                        .keyIssues(List.of("未评估"))
                         .build());
                 continue;
             }

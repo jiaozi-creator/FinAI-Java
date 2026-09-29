@@ -3,6 +3,7 @@
 # FinAI 一键启动脚本 (Linux/Mac)
 
 set -e
+cd "$(dirname "$0")"
 
 echo "================================"
 echo "  FinAI 系统启动脚本"
@@ -39,6 +40,24 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 echo "✓ .env文件检查通过"
+
+# Read KEY=value only; do not execute content from .env as shell code.
+while IFS= read -r entry || [ -n "$entry" ]; do
+    entry="${entry%$'\r'}"
+    [[ -z "$entry" || "$entry" == \#* ]] && continue
+    if [[ ! "$entry" =~ ^[a-zA-Z_][a-zA-Z_0-9]*= ]]; then
+        echo "错误: .env 应仅包含 KEY=value 配置"
+        exit 1
+    fi
+    key="${entry%%=*}"
+    value="${entry#*=}"
+    if [ "${#value}" -ge 2 ]; then
+        if [[ "$value" == \"*\" || "$value" == \'*\' ]]; then
+            value="${value:1:${#value}-2}"
+        fi
+    fi
+    export "$key=$value"
+done < .env
 
 # 创建必要的目录
 echo "创建目录..."

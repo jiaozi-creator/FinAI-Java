@@ -4,6 +4,9 @@ import com.finai.model.AnalysisTask;
 import com.finai.model.dto.*;
 import com.finai.service.AnalysisService;
 import com.finai.service.DemoTaskService;
+import com.finai.agent.TaskOrchestrator;
+import com.finai.model.ExecutionRun;
+import com.finai.model.ExecutionStage;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,6 +34,20 @@ public class AnalysisTaskController {
 
     private final AnalysisService analysisService;
     private final DemoTaskService demoTaskService;
+    private final TaskOrchestrator orchestrator;
+
+    @GetMapping("/{taskId}/runs")
+    public List<ExecutionRun> runs(@PathVariable String taskId) {
+        return orchestrator.runs(taskId);
+    }
+
+    @GetMapping("/{taskId}/runs/{runId}/stages")
+    public List<ExecutionStage> stages(@PathVariable String taskId, @PathVariable String runId) {
+        if (orchestrator.runs(taskId).stream().noneMatch(run -> run.getId().equals(runId))) {
+            throw new com.finai.exception.ResourceNotFoundException("Run not found for task");
+        }
+        return orchestrator.stages(runId);
+    }
 
     @PostMapping("/demo")
     @Operation(summary = "打开内置样例", description = "用内置样例报表跑选题2和选题4，已完成则直接返回")

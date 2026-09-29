@@ -12,7 +12,7 @@ React/Vite -> Spring Boot REST -> TaskExecutionWorker
                            -> AnalysisSnapshot + AuditLog -> 任务详情/报告
 ```
 
-后端为 Java 17、Spring Boot 3.2、LangChain4j 0.35、H2/JPA、PDFBox 3.0.1；前端实际为 React 18/Vite/Ant Design，不是 Java。`backend/src/main/resources/prompts/` 和 `skills/` 已有文件，`McpToolController` 提供只读 HTTP 工具入口，但不是标准 MCP Server。测试目前以 `StatementPipelineTest` 为主，新增服务缺乏相应已存在的测试文件；不能把文档列出的测试命令等同于测试通过。
+后端兼容 Java 17+、Spring Boot 3.2、LangChain4j 0.35、H2/JPA、PDFBox 3.0.1；本机当前使用 JDK 25 并已完成后端测试，不要求为运行项目切换到 JDK 17。前端实际为 React 18/Vite/Ant Design，不是 Java。`backend/src/main/resources/prompts/` 和 `skills/` 已有文件，`McpToolController` 提供只读 HTTP 工具入口，但不是标准 MCP Server。测试目前以 `StatementPipelineTest` 为主，新增服务缺乏相应已存在的测试文件；不能把文档列出的测试命令等同于测试通过。
 
 `IndustryComparisonServiceImpl` 使用随机/固定示例数据；`ForecastServiceImpl` 尚无可核验时间序列预测；`RiskWarningServiceImpl` 有空类别；`SmartPDFParserServiceImpl` 的 OCR/图表处理有 TODO。扩展 API 不得把这些结果包装为真实金融研究结论。单份文本 PDF 的已实现主链路仍优先于这些附加服务。
 
@@ -123,11 +123,11 @@ Ollama 后置评估：在 API Agent 闭环通过后，记录可运行的本地�
 | 阶段 | 依赖、负责人及交付 | 测试和退出标准 | 状态/提交检查点 |
 |---|---|---|---|
 | P0.0 中期规划 | 无实施依赖；A 整理技术计划：架构树、分阶段工作包、状态及错误总结模板；用户审阅并自行提交。 | 与代码现状及项目计划一致；未运行的测试、未复核的样本均不标通过。 | 文档已修订，待用户审阅提交；检查点：用户提交 P0.0。 |
-| P0.1 配置与启动 | 依赖 P0.0 提交；A 统一 `application.yml`、`.env.example`、`LangChain4jConfig`、Windows/Linux 启动脚本与启动文档，B 验证前端联通。默认阿里云 `qwen-plus`，旧 Claude/OpenAI 密钥示例保留但注释，运行适配器保留；竞赛模式限制为国产模型。 | 配置确实进入进程并作用于模型；有效/缺失密钥、显式 mock、未知提供方和竞赛模式选择均有确定结果；无静默 mock、无日志密钥。 | 待执行；检查点：配置与启动可复现。 |
+| P0.1 配置与启动 | 依赖 P0.0 提交；A 统一 `application.yml`、`.env.example`、`LangChain4jConfig`、Windows/Linux 启动脚本与启动文档，B 验证前端联通。默认阿里云 `qwen-plus`，旧 Claude/OpenAI 密钥示例保留但注释，运行适配器保留；竞赛模式限制为国产模型。 | 配置确实进入进程并作用于模型；有效/缺失密钥、显式 mock、未知提供方和竞赛模式选择均有确定结果；无静默 mock、无日志密钥。 | 已实施，待 Windows 实机验收；检查点：配置与启动可复现。 |
 | P0.2 真实样本基线 | 依赖 P0.1；A 核验并获取贵州茅台（600519）、五粮液（000858）的 2023 年官方年报，登记来源、报告期、哈希与使用条件；先制作字段/单位/页码/缺失项的暂定标注，C/E 后续异步复核。合成 demo 单独隔离。 | 两份样本来源可追溯，同输入确定性结果可复现；原始 PDF 按授权使用，不默认提交；标注写明“待 C/E 复核”，旧版 98% 仅为目标。 | 待执行；检查点：可追溯样本清单与暂定答案。 |
 | P0.3 结果可信度与安全 | 依赖 P0.1、P0.2；A 隔离随机同业数值、空预测及未实现风险类别的真实结论路径，校验上传与本地演示访问边界；B 校正页面/API 可用性标记及实际路由，D 检查风险措辞。 | 不把占位值当真实研究结论；对比/预测页未接入路由时不宣称已上线；完成后端测试、前端构建、Windows 文档启动和任务/API 冒烟并留存结果。 | 待执行；检查点：P0 基线与安全验收。 |
-| P1.1 执行契约 | 依赖 P0 验收；A 定义版本化 Agent 输入/输出、只读 Tool schema/白名单、运行与阶段持久化记录；B 对齐兼容 DTO。 | 保留 `CREATED/QUEUED/RUNNING/COMPLETED/FAILED/CANCELLED` 和现有 REST 返回，附加字段不破坏旧客户端轮询；可追溯运行标识、阶段、输入哈希与版本。 | 待执行；检查点：契约与迁移验证。 |
-| P1.2 固定编排 | 依赖 P1.1；A 将现有 `TaskExecutionWorker` 增量接入 TaskOrchestrator、Evidence/Financial/Risk/Valuation/Report/Review 职责，复用 Java 确定性工具和现有 `/rerun`。不引入自由规划循环或独立模型实例。 | 固定样本上传到报告端到端可运行；覆盖失败、取消、重跑、重启后运行记录处理及重复写入；不得复用不完整快照。 | 待执行；检查点：固定编排可复现。 |
+| P1.1 执行契约 | 依赖 P0 验收；A 定义版本化 Agent 输入/输出、只读 Tool schema/白名单、运行与阶段持久化记录；B 对齐兼容 DTO。 | 保留 `CREATED/QUEUED/RUNNING/COMPLETED/FAILED/CANCELLED` 和现有 REST 返回，附加字段不破坏旧客户端轮询；可追溯运行标识、阶段、输入哈希与版本。 | 部分实施，Tool schema/ModelGateway/完整 DTO 尚待补齐；Spring 集成测试已验证运行、阶段、哈希落库。 |
+| P1.2 固定编排 | 依赖 P1.1；A 将现有 `TaskExecutionWorker` 增量接入 TaskOrchestrator、Evidence/Financial/Risk/Valuation/Report/Review 职责，复用 Java 确定性工具和现有 `/rerun`。不引入自由规划循环或独立模型实例。 | 固定样本上传到报告端到端可运行；覆盖失败、取消、重跑、重启后运行记录处理及重复写入；不得复用不完整快照。 | 部分实施；`mvn test` 已通过 11 项，含取消、重启恢复和删除运行记录测试；并发压力和真实上传冒烟仍待执行。 |
 | P1.3 证据、模型与复核 | 依赖 P1.2；A 加入证据/假设门禁、阿里云 ModelGateway、结构化报告复核与模型故障降级，记录模型、Prompt、规则版本和不含敏感原文的审计；C/E 复核金融口径。 | JUnit/集成测试覆盖错误引用、虚构数字、单位和期间冲突、无证据结论；超时生成显式降级的程序报告，非演示模式缺密钥明确失败；无未复核假设冒充事实。 | 待执行；检查点：证据和故障验收。 |
 | P1.4 前端闭环 | 依赖 P1.3；B 在现有任务详情、报告及 API 客户端显示运行阶段、证据、待复核和降级状态，A 配合联调。 | 人工能定位每项关键数值与失败原因；端到端、无密钥、超时、越权访问、重跑/取消场景留存实际验收记录。 | 待执行；检查点：P1 Agent 闭环验收。 |
 | P2.1 PDF 与口径 | 依赖 P1 验收及 C 的标注复核；A/C 处理表格、多期口径、单位冲突与抽取缺失；OCR 仅在评估必要性、效果和成本后单独实施。 | 对人工答案测字段定位、数值/单位/口径正确率及缺失率；缺失或冲突不能用 0 填充；C 复核结果。 | 待执行；检查点：提取评估与口径确认。 |
@@ -151,3 +151,4 @@ Ollama 后置评估：在 API Agent 闭环通过后，记录可运行的本地�
 | 阶段/日期 | 错误现象与根因 | 修复与影响范围 | 回归命令及实际结果 | 未解决事项/复核人 |
 |---|---|---|---|---|
 | P0.0 / 待用户提交 | 文档原仅列 P0–P3 总表，阶段描述易与任务状态混淆；配置默认值与旧密钥示例不一致为待修复的现存风险。 | 修订技术计划，区分已有代码、计划模块和实施阶段；未更改代码或配置。 | 文档与仓库现状核对；后端测试、前端构建及 Windows 启动均未在本工作包执行。 | 配置及运行验证留待 P0.1；财务样本标注与 C/E 审阅留待 P0.2 以后；用户审阅提交。 |
+| P0.1/P1.1/P1.2 / 2026-09-29 | Spring 集成测试首次启动时，H2 不接受审计实体的方言相关 `TEXT` 列定义，且审计与证据表使用重复索引名；任务完成写快照与取消存在竞态风险。 | 审计字段改为 JPA `@Lob`；审计索引改为表名前缀；增加行锁状态服务，将领取、完成/快照写入和失败更新置于事务内，并补充重启阶段关闭逻辑。 | `cd backend; mvn test`：通过，11 tests；`cd frontend; npm run build`：通过（存在包体积警告）；`git diff --check`：通过。Windows 实机启动尚未复核。 | P0.2 官方 PDF、字段答案和 C/E 复核仍待完成；P1 Tool schema、ModelGateway、并发压力测试及完整证据/降级展示待后续；复核人：C/E 待定。 |

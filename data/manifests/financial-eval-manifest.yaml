@@ -1,0 +1,49 @@
+schema_version: "1.0"
+status: "pending_official_pdf_verification"
+last_updated: "2026-09-29"
+rules:
+  original_pdf_commit: false
+  require_sha256: true
+  require_page_or_missing_reason: true
+  require_ce_review_before_baseline: true
+  demo_sample_isolation: true
+samples:
+  - sample_id: "cn_600519_2023_ar"
+    company_code: "600519"
+    company_name: "贵州茅台"
+    report_period: "2023A"
+    source: ""
+    source_status: "pending_official_pdf_verification"
+    sha256: ""
+    usage_condition: "pending"
+    answer_sheet: ""
+    reviewers:
+      accounting: "C: pending"
+      valuation: "E: pending"
+      risk: "D: pending"
+  - sample_id: "cn_000858_2023_ar"
+    company_code: "000858"
+    company_name: "五粮液"
+    report_period: "2023A"
+    source: ""
+    source_status: "pending_official_pdf_verification"
+    sha256: ""
+    usage_condition: "pending"
+    answer_sheet: ""
+    reviewers:
+      accounting: "C: pending"
+      valuation: "E: pending"
+      risk: "D: pending"
+  - sample_id: "synthetic_demo_statement"
+    company_code: "DEMO01"
+    company_name: "景行示范（内置样例）"
+    report_period: "2024A"
+    source: "backend/src/main/resources/samples/demo-statement.txt"
+    source_status: "synthetic_only_not_a_financial_baseline"
+    sha256: "19d962aa3bb1e961061274c16d07d9b4d9b115c91b8ef30d39970d43f7f2ce96"
+    usage_condition: "repository sample"
+    answer_sheet: ""
+    reviewers:
+      accounting: "engineering pipeline only"
+      valuation: "engineering pipeline only"
+      risk: "engineering pipeline only"

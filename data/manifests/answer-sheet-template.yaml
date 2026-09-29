@@ -1,0 +1,28 @@
+schema_version: "1.0"
+sample_id: "replace-with-manifest-sample-id"
+review_status: "待 C/E 复核"
+fields:
+  - field_id: "revenue"
+    field_name: "营业收入"
+    value: null
+    unit: ""
+    period: ""
+    scope: ""
+    page: null
+    source_quote: ""
+    missing_reason: ""
+    reviewer: "C"
+metrics:
+  - metric_id: "revenue_growth_yoy"
+    value: null
+    formula: "(current-prior)/abs(prior)"
+    unit: "ratio"
+    expected_tolerance: "0.000001"
+    reviewer: "C"
+valuation:
+  status: "待 E 复核"
+  assumptions: []
+  expected_range: null
+risks:
+  status: "待 D 复核"
+  expected_rule_ids: []
