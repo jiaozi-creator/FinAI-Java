@@ -97,3 +97,12 @@ bin/
 # Temporary files
 tmp/
 temp/
+
+# Rules
+Agent_role.md
+code_rules.md
+OLD_PROJECTS.txt
+PROBLEM.md
+PROJECT_PLAN_former.md
+TECHNIQUE_PLAN_former.md
+
