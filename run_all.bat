@@ -38,6 +38,9 @@ if not exist "data\uploads" mkdir data\uploads
 if not exist "logs" mkdir logs
 if not exist "outputs\reports" mkdir outputs\reports
 
+echo Stopping leftover FinAI backend if present...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process -Filter \"Name='java.exe'\" | Where-Object { $_.CommandLine -like '*finai-backend-1.0.0.jar*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 1"
+
 pushd backend
 call mvn clean package -DskipTests -q
 if errorlevel 1 (

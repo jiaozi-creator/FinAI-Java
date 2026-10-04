@@ -1,0 +1,33 @@
+schema_version: "1.0"
+recorded_at: "2026-09-29"
+purpose: "P0.2 engineering pipeline smoke — not a C/E financial acceptance record"
+samples:
+  - sample_id: "cn_600519_2023_ar"
+    task_id_first: "TASK_9479022ddfd2"
+    status: "COMPLETED"
+    llm_model: "qwen3.7-flash"
+    artifacts:
+      metrics: "data/manifests/metrics-600519.json"
+      evidence: "data/manifests/evidence-600519.json"
+      anomalies: "data/manifests/anomalies-600519.json"
+      valuation: "data/manifests/valuation-600519.json"
+    reproducibility:
+      action: "POST /api/tasks/TASK_9479022ddfd2/rerun"
+      compared_fields: ["revenue", "netProfit", "totalAssets", "operatingCashFlow", "basicEps"]
+      equal: true
+  - sample_id: "cn_000858_2023_ar"
+    task_id_first: "TASK_7d4c343f4b32"
+    status: "COMPLETED"
+    llm_model: "qwen3.7-flash"
+    artifacts:
+      metrics: "data/manifests/metrics-000858.json"
+      evidence: "data/manifests/evidence-000858.json"
+      anomalies: "data/manifests/anomalies-000858.json"
+      valuation: "data/manifests/valuation-000858.json"
+    reproducibility:
+      note: "First-run COMPLETED; core metrics captured. Full second-run comparison performed on 600519 only in this package."
+demo_isolation:
+  sample_id: "synthetic_demo_statement"
+  company_code: "DEMO01"
+  allowed_use: "orchestration/API smoke only"
+  forbidden_use: "financial accuracy baseline or competition accuracy claims"

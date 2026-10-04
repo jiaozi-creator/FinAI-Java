@@ -9,7 +9,7 @@ import java.math.BigDecimal;
  * 从财报文本中定位到的一行数字。current / prior 都是原文列示值，未做单位换算。
  */
 @Value
-@Builder
+@Builder(toBuilder = true)
 public class ExtractedLine {
     String fieldId;
     String fieldName;
@@ -21,4 +21,17 @@ public class ExtractedLine {
     String snippet;
     Double confidence;
     String sourceFile;
+    String statementType;
+    String sourceSection;
+    String periodType;
+    String periodStart;
+    String periodEnd;
+    String asOfDate;
+    String currentColumn;
+    String priorColumn;
+    Integer candidateRank;
+    String selectionStatus;
+    String selectionReason;
+    String dataQualityStatus;
+    String missingReason;
 }

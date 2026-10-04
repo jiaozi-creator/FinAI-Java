@@ -1,0 +1,245 @@
+schema_version: "1.0"
+sample_id: "cn_600519_2023_ar"
+review_status: "待 C/E 复核"
+baseline_type: "engineering_provisional_not_frozen"
+company_code: "600519"
+company_name: "贵州茅台"
+report_period: "2023A"
+source_pdf_sha256: "2125ff97a452ea79b0d784e2432f7d224b6aecc330b644b593477d69e22f4ed1"
+pipeline_task_id: "TASK_9479022ddfd2"
+pipeline_run_date: "2026-09-29"
+notes: |
+  Values below are copied from the Java extraction/metrics pipeline for engineering reproducibility.
+  They are NOT C/E-signed financial ground truth. Suspected mis-extractions must be corrected before freezing.
+  Known risks: label confusion (营业总收入 vs 营业收入), wrong row matches for 扣非净利润/负债/归母净利润 in dense tables.
+fields:
+  - field_id: "revenue"
+    value: 150560330316.4500
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 63
+    source_quote: "营业总收入  150,560,330,316.45 127,553,959,355.97"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "operating_cost"
+    value: 11867273851.7800
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 63
+    source_quote: "营业成本 40 11,867,273,851.78 10,093,468,616.63"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "net_profit"
+    value: 77521476277.8000
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 116
+    source_quote: "净利润 77,521,476,277.80 65,376,039,957.88"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "net_profit_deducted"
+    value: 20794882754.5500
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 6
+    source_quote: "归属于上市公司股 20,794,882,754.55 15,185,532,336.22 16,895,801,973.35 21,857,854,486.63"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "operating_cash_flow"
+    value: 5244796293.9300
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 6
+    source_quote: "经营活动产生的现 5,244,796,293.93 25,142,381,901.03 19,614,828,823.70 16,591,240,702.43"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "capex"
+    value: 2619755888.7900
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 12
+    source_quote: "购建固定资产、无形资产和其他长期资产支付的 2,619,755,888.79 5,306,546,416.54 -50.63"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "total_assets"
+    value: 272699660092.2500
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 5
+    source_quote: "总资产 272,699,660,092.25 254,500,826,096.02 254,364,804,995.25 7.15 255,315,103,017.82 255,168,195,159.90"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "total_liabilities"
+    value: 49043190797.4300
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 60
+    source_quote: "负债合计  49,043,190,797.43 49,562,744,832.16"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "net_assets"
+    value: 215668571607.4300
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 61
+    source_quote: "归属于母公司所有者权益 215,668,571,607.43 197,480,041,239.46"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "cash"
+    value: 69070136376.1200
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 58
+    source_quote: "货币资金 1 69,070,136,376.12 58,274,318,733.23"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "accounts_receivable"
+    value: 60373410.4100
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 59
+    source_quote: "应收账款 5 60,373,410.41 20,937,144.00"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "inventory"
+    value: 46435185061.5300
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 59
+    source_quote: "存货 9 46,435,185,061.53 38,824,374,236.24"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "goodwill"
+    value: null
+    unit: ""
+    period: "2023A"
+    scope: ""
+    page: null
+    source_quote: ""
+    missing_reason: "not_extracted_by_StatementExtractor"
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "current_assets"
+    value: 225172517821.2800
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 59
+    source_quote: "流动资产合计  225,172,517,821.28 216,611,435,672.92"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "current_liabilities"
+    value: 48697611501.2000
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 60
+    source_quote: "流动负债合计  48,697,611,501.20 49,065,668,798.38"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "minority_interest"
+    value: 7987897687.3900
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 61
+    source_quote: "少数股东权益  7,987,897,687.39 7,458,040,024.40"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "shares_outstanding"
+    value: null
+    unit: ""
+    period: "2023A"
+    scope: ""
+    page: null
+    source_quote: ""
+    missing_reason: "not_extracted_by_StatementExtractor"
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - field_id: "basic_eps"
+    value: 59.4900
+    unit: "元"
+    period: "2023A"
+    scope: "unknown"
+    page: 5
+    source_quote: "基本每股收益（元／股） 59.49 49.93 49.93 19.16 41.74 41.76"
+    missing_reason: ""
+    reviewer: "C"
+    review_status: "待 C 复核"
+metrics:
+  - metric_id: "revenue_growth_yoy"
+    value: 0.18036579
+    missing_reason: ""
+    formula: "(current-prior)/abs(prior)"
+    unit: "ratio"
+    expected_tolerance: "0.000001"
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - metric_id: "net_profit_growth_yoy"
+    value: 0.18577810
+    missing_reason: ""
+    formula: "(current-prior)/abs(prior)"
+    unit: "ratio"
+    expected_tolerance: "0.000001"
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - metric_id: "gross_margin"
+    value: 0.92117928
+    missing_reason: ""
+    formula: "(revenue-operating_cost)/revenue"
+    unit: "ratio"
+    expected_tolerance: "0.000001"
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - metric_id: "net_margin"
+    value: 0.51488647
+    missing_reason: ""
+    formula: "net_profit/revenue"
+    unit: "ratio"
+    expected_tolerance: "0.000001"
+    reviewer: "C"
+    review_status: "待 C 复核"
+  - metric_id: "roe"
+    value: 0.35944726
+    missing_reason: ""
+    formula: "net_profit/net_assets"
+    unit: "ratio"
+    expected_tolerance: "0.000001"
+    reviewer: "C"
+    review_status: "待 C 复核"
+valuation:
+  status: "待 E 复核"
+  assumptions: []
+  expected_range: null
+  note: "Recorded separately in valuation-*.json from pipeline; not frozen."
+risks:
+  status: "待 D 复核"
+  expected_rule_ids: []
+  note: "See anomalies-*.json from pipeline; not frozen."

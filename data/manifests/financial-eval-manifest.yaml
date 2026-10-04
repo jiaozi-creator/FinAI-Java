@@ -1,5 +1,5 @@
 schema_version: "1.0"
-status: "pending_official_pdf_verification"
+status: "obtained_pending_ce_review"
 last_updated: "2026-09-29"
 rules:
   original_pdf_commit: false
@@ -7,16 +7,20 @@ rules:
   require_page_or_missing_reason: true
   require_ce_review_before_baseline: true
   demo_sample_isolation: true
+notes: |
+  Engineering baseline only. Official PDFs are stored locally under data/raw (gitignored).
+  Answer sheets marked 待 C/E 复核 must not be frozen as accuracy baselines until C/E sign-off.
 samples:
   - sample_id: "cn_600519_2023_ar"
     company_code: "600519"
     company_name: "贵州茅台"
     report_period: "2023A"
-    source: ""
-    source_status: "pending_official_pdf_verification"
-    sha256: ""
-    usage_condition: "pending"
-    answer_sheet: ""
+    local_path: "data/raw/600519_2023_annual.pdf"
+    source: "巨潮资讯网 static.cninfo.com.cn/finalpage/2024-04-03/1219506510.PDF — 《贵州茅台酒股份有限公司2023年年度报告》；上交所披露渠道；下载日期 2026-09-29"
+    source_status: "obtained_pending_ce_review"
+    sha256: "2125ff97a452ea79b0d784e2432f7d224b6aecc330b644b593477d69e22f4ed1"
+    usage_condition: "公开披露文件，仅供本地研读与竞赛工程验证；原始 PDF 不提交仓库"
+    answer_sheet: "data/manifests/answers/cn_600519_2023_ar.pending.yaml"
     reviewers:
       accounting: "C: pending"
       valuation: "E: pending"
@@ -25,11 +29,12 @@ samples:
     company_code: "000858"
     company_name: "五粮液"
     report_period: "2023A"
-    source: ""
-    source_status: "pending_official_pdf_verification"
-    sha256: ""
-    usage_condition: "pending"
-    answer_sheet: ""
+    local_path: "data/raw/000858_2023_annual.pdf"
+    source: "巨潮资讯网 static.cninfo.com.cn/finalpage/2024-04-29/1219873658.PDF — 《宜宾五粮液股份有限公司2023年度报告》全文；深交所披露渠道；下载日期 2026-09-29"
+    source_status: "obtained_pending_ce_review"
+    sha256: "1aab0efbe751c145990ac9652c3aff165452ee060bf22a0fe0412996a55e8566"
+    usage_condition: "公开披露文件，仅供本地研读与竞赛工程验证；原始 PDF 不提交仓库"
+    answer_sheet: "data/manifests/answers/cn_000858_2023_ar.pending.yaml"
     reviewers:
       accounting: "C: pending"
       valuation: "E: pending"

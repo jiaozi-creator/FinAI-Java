@@ -6,7 +6,13 @@ version: "1.0.0"
 income_statement:
   - id: "revenue"
     name: "营业收入"
-    aliases: ["营业总收入", "主营业务收入"]
+    aliases: ["主营业务收入"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "revenue_total"
+    name: "营业总收入"
+    aliases: ["营业总收入"]
     unit: "CNY"
     type: "numeric"
 
@@ -35,13 +41,19 @@ income_statement:
 
   - id: "net_profit"
     name: "归属于母公司股东的净利润"
-    aliases: ["归母净利润", "净利润"]
+    aliases: ["归属于上市公司股东的净利润", "归属于母公司所有者的净利润", "归母净利润"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "net_profit_consolidated"
+    name: "合并净利润"
+    aliases: ["合并净利润", "净利润"]
     unit: "CNY"
     type: "numeric"
 
   - id: "net_profit_deducted"
-    name: "扣除非经常性损益后的净利润"
-    aliases: ["扣非净利润"]
+    name: "扣非归母净利润"
+    aliases: ["归属于上市公司股东的扣除非经常性损益的净利润", "归属于母公司股东的扣除非经常性损益的净利润", "扣除非经常性损益后的净利润", "扣非净利润"]
     unit: "CNY"
     type: "numeric"
 
@@ -101,6 +113,39 @@ balance_sheet:
     name: "货币资金"
     aliases: ["现金及现金等价物"]
     unit: "CNY"
+    type: "numeric"
+
+  - id: "accounts_receivable_notes"
+    name: "应收票据"
+    aliases: ["应收票据及应收账款"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "short_term_debt"
+    name: "短期借款"
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "long_term_debt"
+    name: "长期借款"
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "minority_interest"
+    name: "少数股东权益"
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "shares_outstanding"
+    name: "期末总股本"
+    aliases: ["期末总股本", "股本"]
+    unit: "CNY"
+    type: "numeric"
+
+  - id: "basic_eps"
+    name: "基本每股收益"
+    aliases: ["基本每股收益（元／股）", "基本每股收益（元/股）"]
+    unit: "CNY_PER_SHARE"
     type: "numeric"
 
 # 现金流量表字段

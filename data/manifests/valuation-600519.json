@@ -1,0 +1,81 @@
+{
+  "dcfValuation" : {
+    "baseCase" : {
+      "name" : "基准",
+      "enterpriseValue" : 73736105040.5426,
+      "equityValue" : null,
+      "valuePerShare" : null,
+      "freeCashFlows" : [ 3098507891.5950, 3657372715.2838, 4317037634.4004, 5095683537.7887, 6014770524.6720 ],
+      "terminalValue" : 87643799073.7920
+    },
+    "optimistic" : {
+      "name" : "乐观",
+      "enterpriseValue" : 79647524101.9187,
+      "equityValue" : null,
+      "valuePerShare" : null,
+      "freeCashFlows" : [ 3151008699.6978, 3782363047.1096, 4540219207.1105, 5449923815.3164, 6541902106.0121 ],
+      "terminalValue" : 95324859259.0335
+    },
+    "pessimistic" : {
+      "name" : "悲观",
+      "enterpriseValue" : 68194203067.7163,
+      "equityValue" : null,
+      "valuePerShare" : null,
+      "freeCashFlows" : [ 3046007083.4922, 3534482415.7820, 4101292480.6300, 4758999489.3073, 5522180202.0197 ],
+      "terminalValue" : 80466054372.2871
+    },
+    "wacc" : 0.09,
+    "terminalGrowthRate" : 0.02
+  },
+  "relativeValuation" : null,
+  "historicalPercentile" : null,
+  "sensitivityAnalysis" : {
+    "waccRange" : [ 0.07, 0.08, 0.09, 0.10, 0.11 ],
+    "terminalGrowthRange" : [ 0.00, 0.01, 0.02, 0.03, 0.04 ],
+    "valuationMatrix" : [ [ 79053748752.9953, 89979081216.8926, 105274546666.3488, 128217744840.5330, 166456408464.1734 ], [ 68440028245.1282, 76334735197.5462, 86861011134.1036, 101597797445.2840, 123702976912.0545 ], [ 60209073045.4649, 66127149543.3113, 73736105040.5426, 83881379036.8509, 98084762631.6825 ], [ 53645014118.9505, 58209646562.5996, 63915437117.1610, 71251453544.4543, 81032808780.8452 ], [ 48292352739.5788, 51894276055.0114, 56296626773.8734, 61799565172.4509, 68874771684.9077 ] ]
+  },
+  "assumptions" : [ {
+    "parameter" : "FCFF",
+    "value" : "2625040405.14",
+    "source" : "formula",
+    "rationale" : "公式：经营现金流 − 购建长期资产支付的现金。资本开支取支出额，未加回处置收入。",
+    "confidence" : 0.35
+  }, {
+    "parameter" : "预测增速",
+    "value" : "0.18036579",
+    "source" : "formula",
+    "rationale" : "直接采用营业收入同比，没有行业或管理层指引调整。",
+    "confidence" : 0.35
+  }, {
+    "parameter" : "WACC",
+    "value" : "0.09",
+    "source" : "formula",
+    "rationale" : "没有无风险利率、股权风险溢价和资本结构。折现率取 9%，是假设不是事实。",
+    "confidence" : 0.35
+  }, {
+    "parameter" : "永续增长率",
+    "value" : "0.02",
+    "source" : "formula",
+    "rationale" : "缺省 2%，并且必须低于 WACC。不是公司指引。",
+    "confidence" : 0.35
+  }, {
+    "parameter" : "显式预测期",
+    "value" : "5",
+    "source" : "formula",
+    "rationale" : "固定 5 年。",
+    "confidence" : 0.35
+  }, {
+    "parameter" : "净债务",
+    "value" : "未提取",
+    "source" : "formula",
+    "rationale" : "货币资金、短期借款、长期借款未齐套或单位不一致。不桥接到股权价值，区间使用企业价值。",
+    "confidence" : 0.35
+  } ],
+  "valuationRange" : {
+    "low" : 68194203067.7163,
+    "mid" : 73736105040.5426,
+    "high" : 79647524101.9187,
+    "methodology" : "推论：五年 FCFF 折现加戈登终值。区间取悲观/基准/乐观增速（基准增速 ±2 个百分点）的企业价值。",
+    "applicabilityNote" : "只在假设表成立时适用。未扣少数股东权益，未加非核心资产，未做摊薄。相对估值因没有可比公司和市价，未计算。不构成投资建议。"
+  }
+}

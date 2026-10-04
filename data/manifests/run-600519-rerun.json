@@ -1,0 +1,18 @@
+{
+  "taskId" : "TASK_9479022ddfd2",
+  "companyCode" : "600519",
+  "companyName" : "贵州茅台",
+  "reportPeriod" : "2023A",
+  "analysisType" : "FULL",
+  "status" : "COMPLETED",
+  "currentStep" : "完成",
+  "progress" : 100,
+  "reportPath" : null,
+  "errorMessage" : null,
+  "executionTimeMs" : 32409,
+  "llmModel" : "qwen3.7-flash",
+  "llmCallCount" : 1,
+  "createdAt" : "2026-09-29 18:07:18",
+  "startedAt" : "2026-09-29 18:14:42",
+  "completedAt" : "2026-09-29 18:15:14"
+}

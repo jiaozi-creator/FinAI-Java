@@ -54,6 +54,15 @@ public class AnomalySignalDTO {
      */
     private String ruleVersion;
 
+    /** 规则业务结果：TRIGGERED / NOT_TRIGGERED / NOT_EVALUATED。 */
+    private String resultStatus;
+
+    /** 输入数据质量：VALID / INPUT_INCOMPLETE / SCOPE_CONFLICT / PERIOD_CONFLICT / UNIT_CONFLICT。 */
+    private String dataQualityStatus;
+
+    /** 实际参与规则判断的字段。 */
+    private List<String> inputFields;
+
     /**
      * 实际值
      */

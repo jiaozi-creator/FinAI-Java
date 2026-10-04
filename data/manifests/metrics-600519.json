@@ -1,0 +1,85 @@
+{
+  "period" : "2023A",
+  "priorPeriod" : "2022A",
+  "unit" : "元",
+  "scope" : "consolidated",
+  "coreMetrics" : {
+    "revenue" : 150560330316.45,
+    "netProfit" : 77521476277.80,
+    "netProfitDeducted" : 20794882754.55,
+    "operatingCashFlow" : 5244796293.93,
+    "freeCashFlow" : 2625040405.14,
+    "totalAssets" : 272699660092.25,
+    "totalLiabilities" : 49043190797.43,
+    "netAssets" : 215668571607.43,
+    "accountsReceivable" : 60373410.41,
+    "inventory" : 46435185061.53,
+    "goodwill" : null,
+    "minorityInterest" : 7987897687.39,
+    "sharesOutstanding" : null,
+    "basicEps" : 59.49
+  },
+  "yoyGrowth" : {
+    "revenueGrowth" : 0.18036579,
+    "netProfitGrowth" : 0.18577810,
+    "netProfitDeductedGrowth" : 0.36938780,
+    "operatingCashFlowGrowth" : -0.79139620
+  },
+  "qoqGrowth" : null,
+  "ratios" : {
+    "grossMargin" : 0.92117928,
+    "netMargin" : 0.51488647,
+    "roe" : 0.35944726,
+    "roa" : 0.28427419,
+    "assetLiabilityRatio" : 0.17984324,
+    "currentRatio" : 4.62389244,
+    "quickRatio" : null,
+    "cashToDebtRatio" : null,
+    "ocfToNetProfit" : 0.06765604,
+    "accountsReceivableTurnover" : null,
+    "inventoryTurnover" : null
+  },
+  "nonRecurringItems" : [ {
+    "fieldId" : "nri_disposal",
+    "name" : "资产处置损益",
+    "amount" : 1152516.17,
+    "page" : 6,
+    "snippet" : "非经常性损益项目和金额√适用 □不适用非经常性损益项目 2023 年金额 （如适 2022 年金额 2021 年金额用）非流动性资产处置损益，包括已计提资产减值准备的冲销部分 1,152,516.17  -20,567,757.19 -11,920,829.77"
+  }, {
+    "fieldId" : "nri_subsidy",
+    "name" : "政府补助",
+    "amount" : 17137523.89,
+    "page" : 6,
+    "snippet" : "产减值准备的冲销部分计入当期损益的政府补助，但与公司正常经营业务密切相关、符合国家政策规定、按照确定的标准享有、对公司损益 17,137,523.89  14,973,304.55 4,616,000.00"
+  }, {
+    "fieldId" : "nri_fair_value",
+    "name" : "公允价值变动损益",
+    "amount" : 2439902.57,
+    "page" : 6,
+    "snippet" : "定、按照确定的标准享有、对公司损益产生持续影响的政府补助除外除同公司正常经营业务相关的有效套期保值业务外，非金融企业持有金融资产和金融负债产生的公允价值变动损益以 2,439,902.57   -3,750,122.23"
+  }, {
+    "fieldId" : "nri_other_defined",
+    "name" : "其他非经常性损益",
+    "amount" : 4710466.67,
+    "page" : 6,
+    "snippet" : "其他符合非经常性损益定义的损益项目 4,710,466.67  63,840,000.00 61,031,069.26"
+  }, {
+    "fieldId" : "nri_tax",
+    "name" : "所得税影响额",
+    "amount" : -5573340.60,
+    "page" : 6,
+    "snippet" : "所得税影响额 -5,573,340.60  -24,751,373.49 -40,237,983.93"
+  }, {
+    "fieldId" : "nri_minority_impact",
+    "name" : "少数股东权益影响额",
+    "amount" : 1772852.96,
+    "page" : 6,
+    "snippet" : "少数股东权益影响额（税后） 1,772,852.96  1,174,838.97 244,326.28"
+  }, {
+    "fieldId" : "nri_total",
+    "name" : "非经常性损益合计",
+    "amount" : -18492874.77,
+    "page" : 6,
+    "snippet" : "合计 -18,492,874.77  -75,428,959.45 -120,958,278.08"
+  } ]
+}

@@ -105,7 +105,7 @@ function ReportView() {
                   <Descriptions.Item label="归母净利润">
                     {report.metrics.coreMetrics?.netProfit || '-'}
                   </Descriptions.Item>
-                  <Descriptions.Item label="扣非净利润">
+                  <Descriptions.Item label="扣非归母净利润">
                     {report.metrics.coreMetrics?.netProfitDeducted || '-'}
                   </Descriptions.Item>
                   <Descriptions.Item label="经营现金流">
@@ -121,8 +121,8 @@ function ReportView() {
                   <Descriptions.Item label="净利率">
                     {report.metrics.ratios?.netMargin || '-'}
                   </Descriptions.Item>
-                  <Descriptions.Item label="ROE">
-                    {report.metrics.ratios?.roe || '-'}
+                  <Descriptions.Item label="加权平均 ROE">
+                    {report.metrics.ratios?.disclosedWeightedRoe || report.metrics.ratios?.roe || '-'}
                   </Descriptions.Item>
                   <Descriptions.Item label="ROA">
                     {report.metrics.ratios?.roa || '-'}

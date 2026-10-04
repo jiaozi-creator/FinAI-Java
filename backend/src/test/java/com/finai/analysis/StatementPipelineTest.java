@@ -49,9 +49,9 @@ class StatementPipelineTest {
         assertThat(checks.get(0).getStatus()).isEqualTo("PASS");
         assertThat(signals).extracting(signal -> signal.getType().name())
                 .contains("NON_RECURRING_ITEMS", "PROFIT_CASHFLOW_DIVERGENCE", "ACCOUNTING_POLICY_CHANGE");
-        assertThat(value.getValuationRange()).isNotNull();
-        assertThat(value.getValuationRange().getMid()).isNotNull();
-        assertThat(value.getAssumptions()).anyMatch(item -> "WACC".equals(item.getParameter()) && "formula".equals(item.getSource()));
+        assertThat(value.getValuationRange()).isNull();
+        assertThat(value.getAssumptions()).anyMatch(item -> "简式自由现金流".equals(item.getParameter()));
+        assertThat(value.getBusinessStatus()).isEqualTo("BLOCKED_BY_DATA_QUALITY");
         assertThat(value.getRelativeValuation()).isNull();
     }
 
@@ -101,6 +101,64 @@ class StatementPipelineTest {
         var metrics = calculator.calculate(extract.getLines(), "2024A");
         var value = valuation.evaluate(extract.getLines(), metrics);
         assertThat(value.getValuationRange()).isNull();
-        assertThat(value.getAssumptions()).anyMatch(item -> item.getValue().equals("未提取"));
+        assertThat(value.getAssumptions()).anyMatch(item -> item.getParameter().equals("简式自由现金流"));
+    }
+
+    @Test
+    void separatesTotalRevenueAndRejectsParentScopeForRiskRules() {
+        String text = """
+                单位：元
+                合并利润表
+                营业总收入 150560 124099
+                营业收入 147693 124099
+                归属于母公司股东的净利润 74734 62716
+                扣除非经常性损益后的净利润 74752 62700
+                合并现金流量表
+                经营活动产生的现金流量净额 66593 36700
+                """;
+        StatementExtract extract = extractor.extractPages(List.of(new PageText(5, text)), "scope.txt");
+        var metrics = calculator.calculate(extract.getLines(), "2023A");
+
+        assertThat(metrics.getCoreMetrics().getRevenue()).isEqualByComparingTo("147693");
+        assertThat(metrics.getCoreMetrics().getRevenueTotal()).isEqualByComparingTo("150560");
+        assertThat(metrics.getCoreMetrics().getNetProfit()).isEqualByComparingTo("74734");
+        assertThat(metrics.getYoyGrowth().getRevenueGrowth()).isCloseTo(new BigDecimal("0.1899"), within(new BigDecimal("0.001")));
+    }
+
+    @Test
+    void formalDcfRequiresConfirmedFcffGrowthAndCompleteDebtBridge() {
+        String complete = """
+                单位：元
+                合并利润表
+                经营活动产生的现金流量净额 1000 900
+                购建固定资产、无形资产和其他长期资产支付的现金 200 180
+                合并资产负债表
+                货币资金 500 400
+                受限资金 20 10
+                短期借款 100 100
+                一年内到期的非流动负债 10 8
+                应付债券 30 20
+                租赁负债 5 4
+                长期借款 50 50
+                """;
+        StatementExtract extract = extractor.extractPages(List.of(new PageText(1, complete)), "dcf.txt");
+        var metrics = calculator.calculate(extract.getLines(), "2023A");
+        var value = valuation.evaluate(extract.getLines(), metrics, new BigDecimal("0.05"));
+        assertThat(value.getValuationRange()).isNull();
+        assertThat(value.getBusinessStatus()).isEqualTo("INPUT_INCOMPLETE");
+        assertThat(value.getBlockReason()).contains("标准 FCFF");
+
+        var computed = valuation.evaluate(extract.getLines(), metrics,
+                new BigDecimal("0.05"), new BigDecimal("750"));
+        assertThat(computed.getBusinessStatus()).isEqualTo("COMPUTED");
+        assertThat(computed.getValuationRange()).isNotNull();
+        assertThat(computed.getDcfValuation().getBaseCase().getEquityValue()).isNotNull();
+
+        StatementExtract incomplete = extractor.extractPages(List.of(new PageText(1,
+                complete.replace("长期借款 50 50", ""))), "dcf-missing-debt.txt");
+        var blocked = valuation.evaluate(incomplete.getLines(), calculator.calculate(incomplete.getLines(), "2023A"), new BigDecimal("0.05"));
+        assertThat(blocked.getValuationRange()).isNull();
+        assertThat(blocked.getAssumptions()).anyMatch(item -> "净债务".equals(item.getParameter())
+                && "未计算（桥接输入不完整）".equals(item.getValue()));
     }
 }

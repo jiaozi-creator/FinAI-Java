@@ -1,0 +1,18 @@
+﻿{
+    "taskId":  "TASK_9479022ddfd2",
+    "companyCode":  "600519",
+    "companyName":  "è´µå·è\u0085å°",
+    "reportPeriod":  "2023A",
+    "analysisType":  "FULL",
+    "status":  "COMPLETED",
+    "currentStep":  "å®æ",
+    "progress":  100,
+    "reportPath":  null,
+    "errorMessage":  null,
+    "executionTimeMs":  51222,
+    "llmModel":  "qwen3.7-flash",
+    "llmCallCount":  1,
+    "createdAt":  "2026-09-29 18:07:18",
+    "startedAt":  "2026-09-29 18:07:19",
+    "completedAt":  "2026-09-29 18:08:10"
+}

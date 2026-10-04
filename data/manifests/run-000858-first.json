@@ -1,0 +1,18 @@
+{
+  "taskId" : "TASK_7d4c343f4b32",
+  "companyCode" : "000858",
+  "companyName" : "五粮液",
+  "reportPeriod" : "2023A",
+  "analysisType" : "FULL",
+  "status" : "COMPLETED",
+  "currentStep" : "完成",
+  "progress" : 100,
+  "reportPath" : null,
+  "errorMessage" : null,
+  "executionTimeMs" : 27239,
+  "llmModel" : "qwen3.7-flash",
+  "llmCallCount" : 1,
+  "createdAt" : "2026-09-29 18:08:12",
+  "startedAt" : "2026-09-29 18:08:12",
+  "completedAt" : "2026-09-29 18:08:39"
+}

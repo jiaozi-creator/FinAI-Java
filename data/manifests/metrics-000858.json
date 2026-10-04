@@ -1,0 +1,79 @@
+{
+  "period" : "2023A",
+  "priorPeriod" : "2022A",
+  "unit" : "元",
+  "scope" : "consolidated",
+  "coreMetrics" : {
+    "revenue" : 83272067317.19,
+    "netProfit" : 22131513160.16,
+    "netProfitDeducted" : 30116468910.79,
+    "operatingCashFlow" : 9535617536.41,
+    "freeCashFlow" : 6578380854.07,
+    "totalAssets" : 165432981684.75,
+    "totalLiabilities" : 264896186.37,
+    "netAssets" : 80263939356.80,
+    "accountsReceivable" : 42647461.48,
+    "inventory" : 17387841712.87,
+    "goodwill" : 1621619.53,
+    "minorityInterest" : 2659130827.92,
+    "sharesOutstanding" : null,
+    "basicEps" : 7.783
+  },
+  "yoyGrowth" : {
+    "revenueGrowth" : 0.12577528,
+    "netProfitGrowth" : 0.12813230,
+    "netProfitDeductedGrowth" : 0.12953405,
+    "operatingCashFlowGrowth" : 4.31468641
+  },
+  "qoqGrowth" : null,
+  "ratios" : {
+    "grossMargin" : 0.78169840,
+    "netMargin" : 0.26577355,
+    "roe" : 0.27573420,
+    "roa" : null,
+    "assetLiabilityRatio" : null,
+    "currentRatio" : 572.91689084,
+    "quickRatio" : null,
+    "cashToDebtRatio" : null,
+    "ocfToNetProfit" : 0.43086153,
+    "accountsReceivableTurnover" : null,
+    "inventoryTurnover" : null
+  },
+  "nonRecurringItems" : [ {
+    "fieldId" : "nri_disposal",
+    "name" : "资产处置损益",
+    "amount" : -50550226.30,
+    "page" : 8,
+    "snippet" : "非经常性损益项目及金额适用 □不适用项目 2023 年金额 2022 年金额 2021 年金额 说明非流动性资产处置损益（包括已计提资产减值准备的冲销部分） -50,550,226.30 2,282,237.38 -23,622,995.51"
+  }, {
+    "fieldId" : "nri_other",
+    "name" : "其他营业外收支",
+    "amount" : -36541935.37,
+    "page" : 8,
+    "snippet" : "除上述各项之外的其他营业外收入和支出 -36,541,935.37 -62,917,173.08 -80,306,712.64"
+  }, {
+    "fieldId" : "nri_tax",
+    "name" : "所得税影响额",
+    "amount" : 40618434.04,
+    "page" : 8,
+    "snippet" : "所得税影响额  40,618,434.04  8,377,774.30 21,010,672.65"
+  }, {
+    "fieldId" : "nri_minority_impact",
+    "name" : "少数股东权益影响额",
+    "amount" : 16118943.29,
+    "page" : 8,
+    "snippet" : "少数股东权益影响额（税后）  16,118,943.29  3,927,171.59 11,985,497.85"
+  }, {
+    "fieldId" : "nri_total",
+    "name" : "非经常性损益合计",
+    "amount" : 94116358.51,
+    "page" : 8,
+    "snippet" : "合计  94,116,358.51  27,924,688.44 49,345,095.58 --"
+  }, {
+    "fieldId" : "nri_fair_value",
+    "name" : "公允价值变动损益",
+    "amount" : 19,
+    "page" : 19,
+    "snippet" : "长期股权投资 2,020,366,240.69 1.22% 1,986,387,524.78 1.30% -0.08%固定资产 5,189,917,302.17 3.14% 5,312,971,445.61 3.48% -0.34%在建工程 5,623,356,422.20 3.40% 3,773,155,983.95 2.47% 0.93%使用权资产 126,810,315.49 0.08% 380,922,885.84 0.25% -0.17%合同负债 6,864,383,635.25 4.15% 12,379,125,542.70 8.10% -3.95%租赁负债 115,722,608.68 0.07% 16,976,148.73 0.01% 0.06%境外资产占比较高□适用 不适用以公允价值计量的资产和负债适用 □不适用 19"
+  } ]
+}

@@ -2,6 +2,14 @@
 
 version: "1.0.0"
 
+# 所有同比和异常规则必须使用同一报告期、合并范围和单位；证据不完整时降级为数据质量问题
+data_quality_gate:
+  scope: consolidated
+  require_period_match: true
+  require_unit_match: true
+  require_page_evidence: true
+  missing_value_policy: downgrade
+
 rules:
   # 收入与利润匹配性
   - id: "revenue_profit_mismatch"

@@ -20,6 +20,12 @@ import java.util.Map;
 @AllArgsConstructor
 public class ValuationResultDTO {
 
+    /** COMPUTED / INPUT_INCOMPLETE / BLOCKED_BY_DATA_QUALITY。 */
+    private String businessStatus;
+
+    /** 估值没有输出时的可审计原因。 */
+    private String blockReason;
+
     /**
      * DCF估值结果
      */
@@ -187,7 +193,7 @@ public class ValuationResultDTO {
     public static class ValuationAssumption {
         private String parameter;
         private String value;
-        private String source;      // extract, formula, user, llm_suggest
+        private String source;      // extract, formula, default_unconfirmed, user_confirmed, llm_suggested
         private String rationale;
         private Double confidence;
     }

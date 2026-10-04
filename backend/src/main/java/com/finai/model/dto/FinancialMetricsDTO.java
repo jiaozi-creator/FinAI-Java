@@ -65,6 +65,25 @@ public class FinancialMetricsDTO {
      */
     private List<NonRecurringItem> nonRecurringItems;
 
+    /** Per-field calculation provenance and standardized missing reason. */
+    private Map<String, MetricResult> metricDetails;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MetricResult {
+        private BigDecimal value;
+        private String status;
+        private String missingReason;
+        private String formula;
+        private List<String> inputs;
+        private String scope;
+        private String period;
+        private String unit;
+        private List<EvidenceDTO> evidenceRefs;
+    }
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -85,11 +104,15 @@ public class FinancialMetricsDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class CoreMetrics {
+        private BigDecimal revenueTotal;             // 营业总收入（与营业收入严格区分）
         private BigDecimal revenue;                 // 营业收入
         private BigDecimal netProfit;               // 归母净利润
-        private BigDecimal netProfitDeducted;       // 扣非净利润
+        private BigDecimal netProfitConsolidated;   // 合并净利润
+        private BigDecimal netProfitDeducted;       // 扣非归母净利润
         private BigDecimal operatingCashFlow;       // 经营现金流
-        private BigDecimal freeCashFlow;            // 自由现金流
+        private BigDecimal capexProxy;               // 资本开支代理值
+        private BigDecimal simpleFreeCashFlow;       // 简式自由现金流
+        private BigDecimal freeCashFlow;             // 兼容旧客户端，值同 simpleFreeCashFlow
         private BigDecimal totalAssets;             // 总资产
         private BigDecimal totalLiabilities;        // 总负债
         private BigDecimal netAssets;               // 净资产
@@ -97,6 +120,9 @@ public class FinancialMetricsDTO {
         private BigDecimal inventory;               // 存货
         private BigDecimal goodwill;                // 商誉
         private BigDecimal minorityInterest;        // 少数股东权益
+        private BigDecimal totalEquity;              // 合并权益
+        private BigDecimal cash;                     // 货币资金
+        private BigDecimal notesReceivable;          // 应收票据
         private BigDecimal sharesOutstanding;       // 期末总股本
         private BigDecimal basicEps;                // 基本每股收益
     }
@@ -109,10 +135,18 @@ public class FinancialMetricsDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class GrowthRates {
+        private BigDecimal revenueTotalGrowth;      // 营业总收入增长率
         private BigDecimal revenueGrowth;           // 收入增长率
         private BigDecimal netProfitGrowth;         // 净利润增长率
         private BigDecimal netProfitDeductedGrowth; // 扣非净利润增长率
         private BigDecimal operatingCashFlowGrowth; // 经营现金流增长率
+        private BigDecimal simpleFreeCashFlowGrowth;// 简式自由现金流增长率
+        private BigDecimal totalAssetsGrowth;       // 期末资产同比
+        private BigDecimal totalLiabilitiesGrowth;  // 期末负债同比
+        private BigDecimal netAssetsGrowth;         // 期末归母权益同比
+        private BigDecimal minorityInterestGrowth;  // 期末少数股东权益同比
+        private BigDecimal sharesOutstandingGrowth; // 期末总股本同比
+        private BigDecimal basicEpsGrowth;          // 基本每股收益同比
     }
 
     /**
@@ -124,8 +158,11 @@ public class FinancialMetricsDTO {
     @AllArgsConstructor
     public static class FinancialRatios {
         private BigDecimal grossMargin;             // 毛利率
-        private BigDecimal netMargin;               // 净利率
-        private BigDecimal roe;                     // ROE
+        private BigDecimal netMargin;               // 归母净利率
+        private BigDecimal consolidatedNetMargin;   // 合并净利率
+        private BigDecimal roe;                     // 兼容旧客户端，值同 disclosedWeightedRoe
+        private BigDecimal disclosedWeightedRoe;    // 年报披露加权平均 ROE
+        private BigDecimal averageEquityRoe;         // 平均归母权益 ROE
         private BigDecimal roa;                     // ROA
         private BigDecimal assetLiabilityRatio;     // 资产负债率
         private BigDecimal currentRatio;            // 流动比率

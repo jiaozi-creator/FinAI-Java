@@ -33,14 +33,27 @@ public class AnomalyRuleEngine {
     private void nonRecurring(FinancialMetricsDTO metrics, Map<String, ExtractedLine> byField, List<AnomalySignalDTO> signals) {
         FinancialMetricsDTO.CoreMetrics core = metrics.getCoreMetrics();
         if (core == null || core.getNetProfit() == null || core.getNetProfitDeducted() == null) {
+            signals.add(notEvaluated("ANO-NR-1", "非经常性损益占比", AnomalySignalDTO.AnomalyType.NON_RECURRING_ITEMS,
+                    "缺少全年归母净利润或扣非归母净利润。", List.of("net_profit", "net_profit_deducted")));
+            return;
+        }
+        if (!usable(byField.get("net_profit")) || !usable(byField.get("net_profit_deducted"))) {
+            signals.add(notEvaluated("ANO-NR-1", "非经常性损益占比", AnomalySignalDTO.AnomalyType.NON_RECURRING_ITEMS,
+                    "输入不是同口径的合并全年数据，规则不形成经营风险结论。", List.of("net_profit", "net_profit_deducted")));
             return;
         }
         if (core.getNetProfit().compareTo(BigDecimal.ZERO) == 0) {
+            signals.add(notEvaluated("ANO-NR-1", "非经常性损益占比", AnomalySignalDTO.AnomalyType.NON_RECURRING_ITEMS,
+                    "归母净利润为零，比例没有可解释性。", List.of("net_profit", "net_profit_deducted")));
             return;
         }
         BigDecimal gap = core.getNetProfit().subtract(core.getNetProfitDeducted()).abs();
         BigDecimal ratio = gap.divide(core.getNetProfit().abs(), 8, RoundingMode.HALF_UP);
         if (ratio.compareTo(NON_RECURRING_THRESHOLD) < 0) {
+            signals.add(ruleResult("ANO-NR-1", "非经常性损益占比", AnomalySignalDTO.AnomalyType.NON_RECURRING_ITEMS,
+                    "NOT_TRIGGERED", "VALID", ratio, NON_RECURRING_THRESHOLD,
+                    "全年归母净利润与扣非归母净利润差额占比未达到阈值。",
+                    List.of("net_profit", "net_profit_deducted"), byField));
             return;
         }
         AnomalySignalDTO.Severity severity = ratio.compareTo(new BigDecimal("0.50")) >= 0
@@ -55,6 +68,9 @@ public class AnomalyRuleEngine {
                         + "，高于阈值 " + NON_RECURRING_THRESHOLD.toPlainString() + "。差额本身不是非经常性损益附注合计数。")
                 .ruleTriggered("non_recurring_gap")
                 .ruleVersion(RULE_VERSION)
+                .resultStatus("TRIGGERED")
+                .dataQualityStatus("VALID")
+                .inputFields(List.of("net_profit", "net_profit_deducted"))
                 .actualValue(ratio)
                 .threshold(NON_RECURRING_THRESHOLD)
                 .deviation(ratio.subtract(NON_RECURRING_THRESHOLD))
@@ -69,9 +85,18 @@ public class AnomalyRuleEngine {
     private void cashDivergence(FinancialMetricsDTO metrics, Map<String, ExtractedLine> byField, List<AnomalySignalDTO> signals) {
         FinancialMetricsDTO.CoreMetrics core = metrics.getCoreMetrics();
         if (core == null || core.getNetProfit() == null || core.getOperatingCashFlow() == null) {
+            signals.add(notEvaluated("ANO-CF-1", "利润与现金流背离", AnomalySignalDTO.AnomalyType.PROFIT_CASHFLOW_DIVERGENCE,
+                    "缺少全年归母净利润或全年经营现金流。", List.of("net_profit", "operating_cash_flow")));
+            return;
+        }
+        if (!usable(byField.get("net_profit")) || !usable(byField.get("operating_cash_flow"))) {
+            signals.add(notEvaluated("ANO-CF-1", "利润与现金流背离", AnomalySignalDTO.AnomalyType.PROFIT_CASHFLOW_DIVERGENCE,
+                    "输入不是同口径的合并全年数据，规则不形成经营风险结论。", List.of("net_profit", "operating_cash_flow")));
             return;
         }
         if (core.getNetProfit().compareTo(BigDecimal.ZERO) <= 0) {
+            signals.add(notEvaluated("ANO-CF-1", "利润与现金流背离", AnomalySignalDTO.AnomalyType.PROFIT_CASHFLOW_DIVERGENCE,
+                    "归母净利润不为正，本规则不适用。", List.of("net_profit", "operating_cash_flow")));
             return;
         }
         BigDecimal coverage = core.getOperatingCashFlow().divide(core.getNetProfit(), 8, RoundingMode.HALF_UP);
@@ -82,6 +107,10 @@ public class AnomalyRuleEngine {
         boolean signSplit = core.getOperatingCashFlow().compareTo(BigDecimal.ZERO) < 0;
         boolean thin = coverage.compareTo(CASH_COVERAGE_THRESHOLD) < 0;
         if (!signSplit && !thin && !yoySplit) {
+            signals.add(ruleResult("ANO-CF-1", "利润与现金流背离", AnomalySignalDTO.AnomalyType.PROFIT_CASHFLOW_DIVERGENCE,
+                    "NOT_TRIGGERED", "VALID", coverage, CASH_COVERAGE_THRESHOLD,
+                    "全年经营现金流与归母净利润未达到背离阈值。",
+                    List.of("net_profit", "operating_cash_flow"), byField));
             return;
         }
         AnomalySignalDTO.Severity severity = (signSplit || yoySplit)
@@ -106,6 +135,9 @@ public class AnomalyRuleEngine {
                 .description(description.toString())
                 .ruleTriggered("profit_cashflow_divergence")
                 .ruleVersion(RULE_VERSION)
+                .resultStatus("TRIGGERED")
+                .dataQualityStatus("VALID")
+                .inputFields(List.of("net_profit", "operating_cash_flow"))
                 .actualValue(coverage)
                 .threshold(CASH_COVERAGE_THRESHOLD)
                 .deviation(coverage.subtract(CASH_COVERAGE_THRESHOLD))
@@ -119,6 +151,8 @@ public class AnomalyRuleEngine {
 
     private void policyChange(List<PolicyNote> notes, List<AnomalySignalDTO> signals) {
         if (notes == null || notes.isEmpty()) {
+            signals.add(notEvaluated("ANO-AP-1", "会计政策或估计变更", AnomalySignalDTO.AnomalyType.ACCOUNTING_POLICY_CHANGE,
+                    "未定位到可核验的会计政策或估计变更附注。", List.of("accounting_policy")));
             return;
         }
         PolicyNote selected = notes.stream()
@@ -139,6 +173,9 @@ public class AnomalyRuleEngine {
                         : "推论：附注提到会计政策或估计变更，措辞不足以确认是否实质变更。")
                 .ruleTriggered("accounting_policy_mention")
                 .ruleVersion(RULE_VERSION)
+                .resultStatus(confirmed ? "TRIGGERED" : none ? "NOT_TRIGGERED" : "NOT_EVALUATED")
+                .dataQualityStatus(confirmed || none ? "VALID" : "INPUT_INCOMPLETE")
+                .inputFields(List.of("accounting_policy"))
                 .affectedMetrics(List.of())
                 .evidence(List.of(EvidenceDTO.builder()
                         .fieldId("accounting_policy")
@@ -151,8 +188,57 @@ public class AnomalyRuleEngine {
                         ? AnomalySignalDTO.VerificationStatus.CONFIRMED
                         : AnomalySignalDTO.VerificationStatus.INCONCLUSIVE)
                 .verificationDetails("页码 " + selected.getPage() + "，判断=" + selected.getJudgement())
-                .recommendation("观点：若确认变更，需重算变更前后同一口径的同比，不能直接比较列示数。")
+                .recommendation(confirmed
+                        ? "先量化追溯调整对同比的影响；影响显著时才重算，影响不显著时在报告中披露差异。"
+                        : "先取得准则附注和比较期调整金额，再决定是否重算同比。")
                 .build());
+    }
+
+    private boolean usable(ExtractedLine line) {
+        return line != null && line.getCurrent() != null && line.getPage() != null
+                && line.getPage() > 0 && "consolidated".equals(line.getScope())
+                && "annual".equals(line.getPeriodType())
+                && line.getUnit() != null && !"未标注".equals(line.getUnit())
+                && (line.getDataQualityStatus() == null
+                    || "VALID".equals(line.getDataQualityStatus())
+                    || "DISCLOSED_ZERO".equals(line.getDataQualityStatus()));
+    }
+
+    private AnomalySignalDTO notEvaluated(String id, String name, AnomalySignalDTO.AnomalyType type,
+                                          String reason, List<String> fields) {
+        BigDecimal configuredThreshold = switch (id) {
+            case "ANO-NR-1" -> NON_RECURRING_THRESHOLD;
+            case "ANO-CF-1" -> CASH_COVERAGE_THRESHOLD;
+            default -> null;
+        };
+        return AnomalySignalDTO.builder()
+                .anomalyId(id).name(name).type(type).severity(AnomalySignalDTO.Severity.LOW)
+                .description("数据质量：" + reason)
+                .ruleTriggered(id).ruleVersion(RULE_VERSION)
+                .resultStatus("NOT_EVALUATED").dataQualityStatus("INPUT_INCOMPLETE")
+                .threshold(configuredThreshold)
+                .inputFields(fields).affectedMetrics(fields).evidence(List.of())
+                .verificationStatus(AnomalySignalDTO.VerificationStatus.INCONCLUSIVE)
+                .verificationDetails(reason)
+                .recommendation("补齐同范围、同期间、同单位的财报证据后重新运行规则。")
+                .build();
+    }
+
+    private AnomalySignalDTO ruleResult(String id, String name, AnomalySignalDTO.AnomalyType type,
+                                        String status, String quality, BigDecimal actual, BigDecimal threshold,
+                                        String description, List<String> fields,
+                                        Map<String, ExtractedLine> byField) {
+        return AnomalySignalDTO.builder()
+                .anomalyId(id).name(name).type(type).severity(AnomalySignalDTO.Severity.LOW)
+                .description(description).ruleTriggered(id).ruleVersion(RULE_VERSION)
+                .resultStatus(status).dataQualityStatus(quality).inputFields(fields)
+                .actualValue(actual).threshold(threshold).deviation(actual.subtract(threshold))
+                .affectedMetrics(fields)
+                .evidence(fields.stream().map(byField::get).map(this::evidence).filter(java.util.Objects::nonNull).toList())
+                .verificationStatus(AnomalySignalDTO.VerificationStatus.CONFIRMED)
+                .verificationDetails("规则输入口径校验通过。")
+                .recommendation("未达到阈值，无需形成该项经营风险结论。")
+                .build();
     }
 
     private EvidenceDTO evidence(ExtractedLine line) {
