@@ -50,6 +50,7 @@ public class AnalysisServiceImpl implements AnalysisService {
     private final TaskExecutionWorker taskExecutionWorker;
     private final ObjectMapper objectMapper;
     private final TaskOrchestrator orchestrator;
+    private final com.finai.repository.ValuationConfirmationRepository valuationConfirmations;
 
     @Override
     @Transactional
@@ -209,6 +210,7 @@ public class AnalysisServiceImpl implements AnalysisService {
 
         snapshotRepository.deleteByTaskId(taskId);
         orchestrator.delete(taskId);
+        valuationConfirmations.deleteByTaskId(taskId);
         taskRepository.delete(task);
 
         auditLogService.logTaskDeletion(taskId);
@@ -255,6 +257,7 @@ public class AnalysisServiceImpl implements AnalysisService {
             AnalysisReportDTO report = objectMapper.readValue(snapshot.getReportJson(), AnalysisReportDTO.class);
             return new LoadedSnapshot(metrics, anomalies, valuation, report);
         } catch (Exception e) {
+            log.error("Snapshot read failed for task {}: {}", taskId, e.getClass().getSimpleName());
             throw new IllegalStateException("分析结果无法读取", e);
         }
     }

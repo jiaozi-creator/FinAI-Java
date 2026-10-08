@@ -17,12 +17,16 @@ import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /** 固定阶段的持久化账本，计算仍由 Java 分析服务执行。 */
 @Service
 @RequiredArgsConstructor
 public class TaskOrchestrator {
+    public static final List<String> FIXED_STAGES = List.of("EVIDENCE", "FINANCIAL", "ARTICULATION", "RISK", "VALUATION", "REPORT", "REVIEW");
+    public static final Set<String> ALLOWED_TOOLS = Set.of("statement.evidence", "statement.metrics", "anomaly.evaluate",
+            "valuation.dcf", "valuation.sensitivity", "report.validate");
     private final ExecutionRunRepository runs;
     private final ExecutionStageRepository stages;
     private final AnalysisTaskRepository tasks;
@@ -38,6 +42,9 @@ public class TaskOrchestrator {
     }
 
     public <T> T stage(String runId, String name, StageAction<T> action) throws Exception {
+        if (!FIXED_STAGES.contains(name)) {
+            throw new IllegalArgumentException("Unsupported pipeline stage: " + name);
+        }
         ExecutionRun run = runs.findById(runId).orElseThrow();
         run.setCurrentStage(name);
         runs.save(run);
@@ -47,6 +54,15 @@ public class TaskOrchestrator {
         try {
             T result = action.run();
             stage.setStatus("COMPLETED");
+            stage.setBusinessStatus("COMPUTED");
+            if (result instanceof com.finai.model.dto.ValuationResultDTO value) {
+                stage.setBusinessStatus(value.getBusinessStatus());
+                stage.setBusinessReason(value.getBlockReason());
+            } else if (result instanceof AgentResult review) {
+                stage.setBusinessStatus("ok".equals(review.getStatus()) ? "PASSED" : "NEEDS_REVIEW");
+                stage.setBusinessReason(String.join("；", review.getWarnings()));
+                stage.setReviewJson(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(review));
+            }
             return result;
         } catch (Exception e) {
             stage.setStatus("FAILED");
@@ -70,6 +86,16 @@ public class TaskOrchestrator {
 
     public List<ExecutionStage> stages(String runId) {
         return stages.findByRunIdOrderByStartedAtAsc(runId);
+    }
+
+    public void freezeValuationInputs(String runId, String json) {
+        ExecutionRun run = runs.findById(runId).orElseThrow();
+        run.setValuationInputsJson(json); runs.save(run);
+    }
+
+    public void freezeSnapshot(String runId, String json) {
+        ExecutionRun run = runs.findById(runId).orElseThrow();
+        run.setSnapshotJson(json); runs.save(run);
     }
 
     public List<ExecutionRun> runs(String taskId) {

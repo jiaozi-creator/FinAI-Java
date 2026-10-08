@@ -171,13 +171,14 @@ public class ReportComposer {
             return "事实：毛利率、净利率或 ROE 缺少分子或分母，未计算。";
         }
         return "事实：毛利率 " + pct(ratios.getGrossMargin()) + "，净利率 " + pct(ratios.getNetMargin())
-                + "，ROE " + pct(ratios.getRoe()) + "。ROE 分母是期末权益，不是平均权益。";
+                + "，加权平均 ROE（年报披露） " + pct(ratios.getDisclosedWeightedRoe())
+                + "，平均归母权益 ROE " + pct(ratios.getAverageEquityRoe()) + "。两种 ROE 口径分别列示。";
     }
 
     private String cashText(FinancialMetricsDTO metrics, List<AnomalySignalDTO> anomalies) {
         FinancialMetricsDTO.FinancialRatios ratios = metrics.getRatios();
         String ratio = ratios == null ? "未提取" : pct(ratios.getOcfToNetProfit());
-        boolean hit = anomalies.stream().anyMatch(item -> item.getType() == AnomalySignalDTO.AnomalyType.PROFIT_CASHFLOW_DIVERGENCE);
+        boolean hit = anomalies.stream().anyMatch(item -> item.getType() == AnomalySignalDTO.AnomalyType.PROFIT_CASHFLOW_DIVERGENCE && "TRIGGERED".equals(item.getResultStatus()));
         return "事实：经营现金流/归母净利润 = " + ratio + "。"
                 + (hit ? "推论：已触发利润与现金流背离规则。" : "推论：未触发利润与现金流背离规则。");
     }

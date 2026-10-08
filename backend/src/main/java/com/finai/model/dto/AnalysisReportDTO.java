@@ -22,6 +22,8 @@ public class AnalysisReportDTO {
      * 任务ID
      */
     private String taskId;
+    private com.finai.agent.AgentResult reviewResult;
+    private String businessStatus;
 
     /**
      * 报告标题

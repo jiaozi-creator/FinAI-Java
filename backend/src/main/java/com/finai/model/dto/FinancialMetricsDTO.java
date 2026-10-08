@@ -82,6 +82,8 @@ public class FinancialMetricsDTO {
         private String period;
         private String unit;
         private List<EvidenceDTO> evidenceRefs;
+        private Integer displayScale;
+        private String source;
     }
 
     @Data

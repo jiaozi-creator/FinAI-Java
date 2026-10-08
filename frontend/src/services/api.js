@@ -50,6 +50,9 @@ export const taskAPI = {
   },
 
   getRuns: (taskId) => api.get(`/tasks/${taskId}/runs`),
+  getValuationInputs: (taskId) => api.get(`/tasks/${taskId}/valuation-inputs`),
+  confirmValuationInputs: (taskId, data) => api.post(`/tasks/${taskId}/valuation-inputs/confirm`, data),
+  rerun: (taskId) => api.post(`/tasks/${taskId}/rerun`),
 
   getStages: (taskId, runId) => api.get(`/tasks/${taskId}/runs/${runId}/stages`),
 

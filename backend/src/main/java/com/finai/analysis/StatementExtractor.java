@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.pdfbox.text.TextPosition;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -86,14 +87,16 @@ public class StatementExtractor {
                 return extractPages(List.of(new PageText(1, text)), filePath);
             }
             try (PDDocument document = Loader.loadPDF(path.toFile())) {
-                PDFTextStripper stripper = new PDFTextStripper();
+                PositionedStripper stripper = new PositionedStripper();
                 stripper.setSortByPosition(true);
                 List<PageText> pages = new ArrayList<>();
                 int total = document.getNumberOfPages();
                 for (int i = 1; i <= total; i++) {
                     stripper.setStartPage(i);
                     stripper.setEndPage(i);
-                    pages.add(new PageText(i, stripper.getText(document)));
+                    stripper.resetRows();
+                    String pageText = stripper.getText(document);
+                    pages.add(new PageText(i, pageText, List.copyOf(stripper.positionedRows)));
                 }
                 return extractPages(pages, filePath);
             }
@@ -107,9 +110,15 @@ public class StatementExtractor {
         List<PolicyNote> notes = new ArrayList<>();
         String carriedUnit = "未标注";
         ParseContext context = new ParseContext();
+        ParseContext positionedContext = new ParseContext();
         boolean[] nonRecurringOpen = {false};
         for (PageText page : pages) {
+            int firstCandidate = found.size();
             String text = page.getText() == null ? "" : page.getText();
+            if (text.contains("二、财务报表") && text.contains("合并资产负债表")) {
+                context.inNotes = false;
+                positionedContext.inNotes = false;
+            }
             String detectedUnit = detectUnit(text);
             if (!"未标注".equals(detectedUnit)) {
                 carriedUnit = detectedUnit;
@@ -136,6 +145,9 @@ public class StatementExtractor {
             }
             parseAnnualSummary(text, page.getPageNumber(), unit, sourceFile, found);
             parseNonRecurring(text, page.getPageNumber(), unit, context.scope, sourceFile, found, nonRecurringOpen);
+            parsePositionedTables(page, unit, sourceFile, found, positionedContext);
+            // 保存整页表格上下文，行标题、列标题和折行均可展开复核。
+            for (int n = firstCandidate; n < found.size(); n++) found.set(n, found.get(n).toBuilder().snippet(text).build());
             PolicyNote note = matchPolicy(text, page.getPageNumber());
             if (note != null) {
                 notes.add(note);
@@ -201,7 +213,10 @@ public class StatementExtractor {
         StringBuilder continuation = new StringBuilder();
         List<BigDecimal> numbers = List.of();
         for (int offset = 1; offset <= 8 && index + offset < rows.length; offset++) {
-            continuation.append(' ').append(normalize(rows[index + offset]));
+            String next = normalize(rows[index + offset]);
+            if (SPECS.stream().anyMatch(spec -> spec.aliases().stream().anyMatch(next::startsWith))
+                    || next.contains("单位") || next.contains("合并") || next.contains("母公司")) break;
+            continuation.append(' ').append(next);
             numbers = readNumbers(continuation.toString());
             if (!numbers.isEmpty()) break;
         }
@@ -224,7 +239,7 @@ public class StatementExtractor {
                 .unit(normalizedUnit)
                 .scope(scope)
                 .page(page)
-                .snippet(truncate(snippet, 400))
+                .snippet(snippet)
                 .confidence(numbers.size() > 1 ? 0.8 : 0.55)
                 .sourceFile(sourceFile)
                 .build();
@@ -260,9 +275,26 @@ public class StatementExtractor {
         if (!matcher.find()) return;
         Spec spec = SPECS.stream().filter(item -> fieldId.equals(item.fieldId())).findFirst().orElse(null);
         if (spec == null) return;
-        List<BigDecimal> values = List.of(parseNumber(matcher.group(1)), parseNumber(matcher.group(2)));
-        String snippet = text.substring(Math.max(0, matcher.start() - 24), Math.min(text.length(), matcher.end() + 24)).replaceAll("\\s+", " ");
-        found.add(enrich(toLine(spec, values, page, unit, "consolidated", sourceFile, snippet), context));
+        // 调整前/后列须一起读取；旧规则只捕获前两列，误把调整前金额用于同比。
+        int rowEnd = text.indexOf('\n', matcher.end());
+        if (rowEnd < 0) rowEnd = text.length();
+        String row = text.substring(matcher.start(1), rowEnd);
+        Matcher amountMatcher = Pattern.compile("-?\\d[\\d,]*\\.\\d+(?![\\d%])").matcher(row);
+        List<BigDecimal> amounts = new ArrayList<>();
+        while (amountMatcher.find()) amounts.add(parseNumber(amountMatcher.group()));
+        boolean adjusted = normalize(text).contains("调整前") && normalize(text).contains("调整后") && amounts.size() >= 3;
+        List<BigDecimal> values = List.of(parseNumber(matcher.group(1)), adjusted ? amounts.get(2) : parseNumber(matcher.group(2)));
+        String snippet = text.substring(matcher.start(), rowEnd);
+        Matcher percentage = Pattern.compile("(-?\\d+(?:\\.\\d+)?)%").matcher(row);
+        ExtractedLine candidate = enrich(toLine(spec, values, page, unit, "consolidated", sourceFile, snippet), context);
+        if (percentage.find()) candidate = candidate.toBuilder().disclosedGrowth(new BigDecimal(percentage.group(1)).movePointLeft(2)).build();
+        Matcher reportYear = Pattern.compile("(20\\d{2})\\s*年度报告").matcher(normalize(text));
+        if (reportYear.find()) {
+            String year = reportYear.group(1);
+            candidate = candidate.toBuilder().currentColumn(year).priorColumn((Integer.parseInt(year) - 1) + " 调整后")
+                    .periodStart(year + "-01-01").periodEnd(year + "-12-31").asOfDate(year + "-12-31").build();
+        }
+        found.add(candidate.toBuilder().selectionReason("annual_summary_columns").build());
     }
 
     private void addSummaryPercentCandidate(String text, int page, String unit, String sourceFile, ParseContext context,
@@ -285,7 +317,7 @@ public class StatementExtractor {
                 || !"consolidated".equals(context.scope)) return null;
         String line = normalize(raw);
         for (Spec spec : SPECS) {
-            if (!("short_term_debt".equals(spec.fieldId()) || "long_term_debt".equals(spec.fieldId()) || "notes_receivable".equals(spec.fieldId()))) continue;
+            if (!("short_term_debt".equals(spec.fieldId()) || "long_term_debt".equals(spec.fieldId()) || "notes_receivable".equals(spec.fieldId()) || "bonds_payable".equals(spec.fieldId()))) continue;
             for (String alias : spec.aliases()) {
                 if (line.equals(alias)) {
                     return enrich(toLine(spec, List.of(BigDecimal.ZERO), page, unit, context.scope, sourceFile, line), context)
@@ -320,19 +352,27 @@ public class StatementExtractor {
     private static boolean isAnnualSummaryMonetaryField(String fieldId) {
         return switch (fieldId) {
             case "revenue", "revenue_total", "net_profit", "net_profit_deducted",
-                    "operating_cash_flow", "total_assets", "net_assets" -> true;
+                    "net_profit_consolidated", "operating_cash_flow", "total_assets", "net_assets" -> true;
             default -> false;
         };
     }
 
     private void updateContext(String raw, ParseContext context) {
         String line = normalize(raw);
+        if (line.contains("财务附注中报表的单位")) return;
+        if (line.matches(".*(?:财务报表附注|报表项目注释|公司基本情况|重要会计政策及会计估计).*")) {
+            if (!line.contains("详见") && !line.contains("具体见")) context.inNotes = true;
+            context.section = "notes";
+            context.statementType = "notes";
+            context.scope = "unknown";
+            context.periodType = "unknown";
+        }
         if (line.contains("分季度主要财务") || line.contains("季度主要财务指标")) {
             context.section = "quarterly_summary";
             context.statementType = "financial_highlights";
             context.periodType = "quarterly";
             context.scope = "consolidated";
-        } else if (line.contains("主要会计数据和财务指标")) {
+        } else if (line.contains("主要会计数据和财务指标") || line.contains("近三年主要会计数据")) {
             context.section = "annual_summary";
             context.statementType = "financial_highlights";
             context.periodType = "annual";
@@ -373,13 +413,15 @@ public class StatementExtractor {
             context.periodType = "annual";
         }
         Matcher years = Pattern.compile("(20\\d{2})年?").matcher(line);
+        if (context.inNotes && "audited_annual_main".equals(context.section)) context.section = "notes";
         List<String> values = new ArrayList<>();
         while (years.find()) values.add(years.group(1));
         if (!values.isEmpty() && (line.contains("本期") || line.contains("上期") || values.size() >= 2)) {
-            context.currentColumn = values.get(0);
-            if (values.size() > 1) context.priorColumn = values.get(1);
-            context.periodStart = values.get(0) + "-01-01";
-            context.periodEnd = values.get(0) + "-12-31";
+            String currentYear = values.stream().max(String::compareTo).orElseThrow();
+            context.currentColumn = currentYear;
+            context.priorColumn = values.stream().filter(y -> !y.equals(currentYear)).max(String::compareTo).orElse(null);
+            context.periodStart = currentYear + "-01-01";
+            context.periodEnd = currentYear + "-12-31";
             context.asOfDate = context.periodEnd;
         }
     }
@@ -420,6 +462,7 @@ public class StatementExtractor {
                 return;
             }
             Spec spec = nriSpec(line);
+            if (spec == null && !numbers.isEmpty()) spec = nriSpec(label + line);
             if (spec != null && !numbers.isEmpty()) {
                 found.add(toLine(spec, numbers, page, unit, scope, sourceFile, line));
                 label.setLength(0);
@@ -430,8 +473,7 @@ public class StatementExtractor {
                 if (i + 1 < rows.length) {
                     around.append(normalize(rows[i + 1]));
                 }
-                String window = around.substring(Math.max(0, around.length() - 48));
-                Spec wrapped = nriSpec(window);
+                Spec wrapped = nriSpec(around.toString());
                 if (wrapped != null) {
                     found.add(toLine(wrapped, numbers, page, unit, scope, sourceFile, around + " " + line));
                 }
@@ -449,12 +491,14 @@ public class StatementExtractor {
         if (label.contains("资产处置")) {
             return new Spec("nri_disposal", "资产处置损益", List.of("资产处置损益"));
         }
-        if (label.contains("政府补助") && !label.contains("政府补助除外")) {
+        if (label.contains("政府补助")) {
             return new Spec("nri_subsidy", "政府补助", List.of("政府补助"));
         }
         if (label.contains("其他营业外")) {
             return new Spec("nri_other", "其他营业外收支", List.of("其他营业外收支"));
         }
+        if (label.contains("资金占用费")) return new Spec("nri_fund_occupation", "资金占用费", List.of("资金占用费"));
+        if (label.contains("减值准备转回")) return new Spec("nri_impairment_reversal", "应收款项减值准备转回", List.of("减值准备转回"));
         if (label.contains("其他符合非经常性")) {
             return new Spec("nri_other_defined", "其他非经常性损益", List.of("其他非经常性损益"));
         }
@@ -472,21 +516,24 @@ public class StatementExtractor {
         if (idx < 0) {
             idx = text.indexOf("会计估计变更");
         }
+        if (idx < 0 && text.contains("追溯调整") && text.contains("会计准则")) {
+            idx = text.indexOf("追溯调整");
+        }
         if (idx < 0) {
             return null;
         }
-        int start = Math.max(0, idx - 30);
-        int end = Math.min(text.length(), idx + 220);
+        int start = 0;
+        int end = text.length();
         String snippet = text.substring(start, end).replaceAll("\\s+", " ").trim();
         String judgement;
-        if (NO_MATERIAL.matcher(snippet).find()) {
+        if (NO_MATERIAL.matcher(snippet).find() && !CONFIRMED.matcher(snippet).find()) {
             judgement = "NO_MATERIAL_CHANGE";
         } else if (CONFIRMED.matcher(snippet).find()) {
             judgement = "CONFIRMED_CHANGE";
         } else {
             judgement = "MENTIONED";
         }
-        return PolicyNote.builder().page(page).snippet(truncate(snippet, 400)).judgement(judgement).build();
+        return PolicyNote.builder().page(page).snippet(snippet).judgement(judgement).build();
     }
 
     private StatementExtract select(List<ExtractedLine> found, List<PolicyNote> notes) {
@@ -517,12 +564,12 @@ public class StatementExtractor {
     }
 
     private void addReviewedShareCount(List<ExtractedLine> found) {
-        boolean hasDirectShareCount = found.stream().anyMatch(line -> "shares_outstanding".equals(line.getFieldId()));
-        if (hasDirectShareCount) return;
+        boolean hasComparableDirectShareCount = found.stream().anyMatch(line -> "shares_outstanding".equals(line.getFieldId())
+                && line.getCurrent() != null && line.getPrior() != null);
+        if (hasComparableDirectShareCount) return;
         found.stream()
                 .filter(line -> "share_capital".equals(line.getFieldId()))
                 .filter(line -> "consolidated".equals(line.getScope()))
-                .filter(line -> "audited_annual_main".equals(line.getSourceSection()))
                 .filter(line -> line.getCurrent() != null)
                 .filter(this::hasReviewedOneYuanParValue)
                 .findFirst()
@@ -558,6 +605,8 @@ public class StatementExtractor {
             default -> -50;
         };
         int score = section + scope + (line.getPrior() != null ? 1 : 0);
+        if ("positioned_table".equals(line.getSelectionReason())) score += 2000;
+        if ("annual_summary_columns".equals(line.getSelectionReason())) score += 2000;
         if ("annual_summary".equals(line.getSourceSection())
                 && ("net_profit_deducted".equals(line.getFieldId()) || "weighted_average_roe".equals(line.getFieldId()))) {
             score += 500;
@@ -688,6 +737,116 @@ public class StatementExtractor {
     private record Spec(String fieldId, String name, List<String> aliases) {
     }
 
+    /** Preserve column positions: a blank current cell must not shift the prior value left. */
+    private void parsePositionedTables(PageText page, String unit, String file, List<ExtractedLine> found, ParseContext context) {
+        List<PageText.PositionedRow> rows = page.getRows();
+        boolean pageNotes = page.getText() != null && page.getText().contains("财务附注中报表")
+                && !page.getText().contains("二、财务报表");
+        String pending = "";
+        boolean nri = false;
+        boolean priorBeforeAdjustment = normalize(page.getText()).contains("调整前") && normalize(page.getText()).contains("调整后");
+        for (int i = 0; i < rows.size(); i++) {
+            var row = rows.get(i);
+            String raw = row.text();
+            if (nri && raw.contains("其他营业外")) pending = "";
+            updateContext(raw, context);
+            if (pageNotes) {
+                context.section = "notes";
+                context.statementType = "notes";
+                context.inNotes = true;
+            }
+            if (raw.contains("非经常性损益项目")) { nri = true; pending = ""; }
+            if (raw.contains("单位") || raw.contains("项目") && raw.contains("2023") || raw.contains("第一季度")) { pending = ""; continue; }
+            List<PageText.NumberCell> cells = row.numbers().stream()
+                    .filter(c -> c.text().contains(".") || c.text().contains(",") || !c.text().matches("(?:19|20)\\d{2}"))
+                    .toList();
+            String next = i + 1 < rows.size() && rows.get(i + 1).numbers().isEmpty() ? rows.get(i + 1).text() : "";
+            String nextLabel = normalize(next);
+            if (!nri && SPECS.stream().anyMatch(s -> s.aliases().stream().anyMatch(nextLabel::startsWith))) next = "";
+            String label = normalize(pending + raw + next).replaceAll("[0-9,，.\\-%]+", "");
+            Spec spec = nri ? nriSpec(label) : SPECS.stream()
+                    .filter(s -> s.aliases().stream().anyMatch(label::contains))
+                    .max(java.util.Comparator.comparingInt(s -> s.aliases().stream().filter(label::contains).mapToInt(String::length).max().orElse(0)))
+                    .orElse(null);
+            if (nri && spec == null) spec = nriSpec(label);
+            if (nri && raw.trim().startsWith("合计")) spec = new Spec("nri_total", "非经常性损益合计", List.of("合计"));
+            boolean main = "audited_annual_main".equals(context.section);
+            boolean summary = "annual_summary".equals(context.section);
+            if (spec == null || (!main && !summary && !nri)) {
+                pending = cells.isEmpty() ? pending + raw : "";
+                continue;
+            }
+            if ("net_profit_consolidated".equals(spec.fieldId()) && !(main && "income_statement".equals(context.statementType))) {
+                pending = "";
+                continue;
+            }
+            List<PageText.NumberCell> amounts = cells.stream().filter(c -> !c.text().endsWith("%") && (c.text().contains(".") || c.text().contains(","))).toList();
+            if (amounts.isEmpty()) {
+                if (main && "balance_sheet".equals(context.statementType) && raw.trim().equals(spec.aliases().get(0))) {
+                    found.add(enrich(toLine(spec, List.of(BigDecimal.ZERO), page.getPageNumber(), unit, context.scope, file, raw), context)
+                            .toBuilder().selectionReason("positioned_table").dataQualityStatus("DISCLOSED_ZERO")
+                            .missingReason("主表对应金额单元格为空，已按列位置验证为零").build());
+                }
+                pending += raw;
+                continue;
+            }
+            BigDecimal current = parseNumber(amounts.get(0).text());
+            BigDecimal prior = amounts.size() > 1 ? parseNumber(amounts.get(1).text()) : null;
+            if (summary && priorBeforeAdjustment && amounts.size() > 2) prior = parseNumber(amounts.get(2).text());
+            if (main && "balance_sheet".equals(context.statementType)) {
+                if (amounts.size() >= 2) {
+                    context.currentX = amounts.get(0).endX(); context.priorX = amounts.get(1).endX();
+                } else if (context.priorX != null && Math.abs(amounts.get(0).endX() - context.priorX) < Math.abs(amounts.get(0).endX() - context.currentX)) {
+                    prior = current; current = BigDecimal.ZERO;
+                }
+            }
+            if ("weighted_average_roe".equals(spec.fieldId())) { pending = ""; continue; }
+            ExtractedLine parsed = enrich(toLine(spec, prior == null ? List.of(current) : List.of(current, prior), page.getPageNumber(), unit,
+                    nri ? "consolidated" : context.scope, file, pending + raw + next), context);
+            if (nri) parsed = parsed.toBuilder().sourceSection("notes").statementType("non_recurring").periodType("annual").scope("consolidated").build();
+            if (summary) {
+                final Spec selectedSpec = spec;
+                var percentages = cells.stream().filter(c -> c.text().endsWith("%")).toList();
+                if (!percentages.isEmpty()) parsed = parsed.toBuilder().disclosedGrowth(parseNumber(percentages.get(0).text().replace("%", "")).movePointLeft(2)).build();
+                else if ("basic_eps".equals(selectedSpec.fieldId()) && amounts.size() > 3) {
+                    parsed = parsed.toBuilder().disclosedGrowth(parseNumber(amounts.get(3).text()).movePointLeft(2)).build();
+                }
+            }
+            found.add(parsed.toBuilder().selectionReason("positioned_table")
+                    .dataQualityStatus(current.signum() == 0 ? "DISCLOSED_ZERO" : "VALUE_AVAILABLE").build());
+            pending = "";
+            if ("nri_total".equals(spec.fieldId())) nri = false;
+        }
+    }
+
+    private static class PositionedStripper extends PDFTextStripper {
+        private final List<PageText.PositionedRow> positionedRows = new ArrayList<>();
+        private final List<TextPosition> glyphs = new ArrayList<>();
+        PositionedStripper() throws IOException { super(); }
+        void resetRows() { positionedRows.clear(); glyphs.clear(); }
+        @Override protected void writeString(String text, List<TextPosition> positions) throws IOException {
+            glyphs.addAll(positions);
+            super.writeString(text, positions);
+        }
+        @Override protected void writeLineSeparator() throws IOException {
+            if (!glyphs.isEmpty()) {
+                StringBuilder text = new StringBuilder();
+                List<TextPosition> chars = new ArrayList<>();
+                for (TextPosition glyph : glyphs) for (int n = 0; n < glyph.getUnicode().length(); n++) {
+                    text.append(glyph.getUnicode().charAt(n)); chars.add(glyph);
+                }
+                List<PageText.NumberCell> cells = new ArrayList<>();
+                Matcher matcher = Pattern.compile("-?\\d[\\d,]*(?:\\.\\d+)?%?").matcher(text);
+                while (matcher.find()) {
+                    var last = chars.get(matcher.end() - 1);
+                    cells.add(new PageText.NumberCell(matcher.group(), chars.get(matcher.start()).getXDirAdj(), last.getXDirAdj() + last.getWidthDirAdj()));
+                }
+                positionedRows.add(new PageText.PositionedRow(text.toString(), cells)); glyphs.clear();
+            }
+            super.writeLineSeparator();
+        }
+    }
+
     private static class ParseContext {
         private String scope = "unknown";
         private String statementType = "unknown";
@@ -698,5 +857,8 @@ public class StatementExtractor {
         private String asOfDate;
         private String currentColumn;
         private String priorColumn;
+        private Float currentX;
+        private Float priorX;
+        private boolean inNotes;
     }
 }

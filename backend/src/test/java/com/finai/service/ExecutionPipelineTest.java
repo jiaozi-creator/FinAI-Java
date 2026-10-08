@@ -50,7 +50,13 @@ class ExecutionPipelineTest {
         assertThat(runs.get(0).getInputSha256()).matches("[0-9a-f]{64}");
         assertThat(runs.get(0).getStatus()).isEqualTo("COMPLETED");
         assertThat(orchestrator.stages(runs.get(0).getId())).extracting("name")
-                .containsExactly("EVIDENCE", "FINANCIAL", "ARTICULATION", "RISK", "VALUATION", "REPORT");
+                .containsExactly("EVIDENCE", "FINANCIAL", "ARTICULATION", "RISK", "VALUATION", "REPORT", "REVIEW");
+        var storedReport = service.getReport(taskId);
+        assertThat(storedReport.getReviewResult()).isNotNull();
+        assertThat(storedReport.getReviewResult().getStatus()).isIn("ok", "degraded");
+        assertThat(service.getMetrics(taskId).getCoreMetrics().getRevenue()).isNotNull();
+        assertThat(service.getAnomalies(taskId)).isNotNull();
+        assertThat(service.getValuation(taskId).getBusinessStatus()).isEqualTo("INPUT_INCOMPLETE");
     }
 
     @Test

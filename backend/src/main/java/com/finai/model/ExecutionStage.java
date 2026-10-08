@@ -22,4 +22,9 @@ public class ExecutionStage {
     private LocalDateTime startedAt;
     private LocalDateTime finishedAt;
     private String errorCode;
+    private String businessStatus;
+    @Lob
+    private String businessReason;
+    @Lob
+    private String reviewJson;
 }

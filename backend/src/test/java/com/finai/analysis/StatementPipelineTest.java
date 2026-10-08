@@ -51,7 +51,7 @@ class StatementPipelineTest {
                 .contains("NON_RECURRING_ITEMS", "PROFIT_CASHFLOW_DIVERGENCE", "ACCOUNTING_POLICY_CHANGE");
         assertThat(value.getValuationRange()).isNull();
         assertThat(value.getAssumptions()).anyMatch(item -> "简式自由现金流".equals(item.getParameter()));
-        assertThat(value.getBusinessStatus()).isEqualTo("BLOCKED_BY_DATA_QUALITY");
+        assertThat(value.getBusinessStatus()).isEqualTo("INPUT_INCOMPLETE");
         assertThat(value.getRelativeValuation()).isNull();
     }
 
@@ -148,8 +148,19 @@ class StatementPipelineTest {
         assertThat(value.getBusinessStatus()).isEqualTo("INPUT_INCOMPLETE");
         assertThat(value.getBlockReason()).contains("标准 FCFF");
 
-        var computed = valuation.evaluate(extract.getLines(), metrics,
-                new BigDecimal("0.05"), new BigDecimal("750"));
+        var computed = valuation.evaluate(extract.getLines(), metrics, ValuationParameters.builder()
+                .confirmedGrowth(new BigDecimal("0.05"))
+                .confirmedFcff(new BigDecimal("750"))
+                .assumptionsConfirmed(true)
+                .bridgePolicyConfirmed(true)
+                .bridgePolicy("cash minus debt; minority and non-core adjustments explicit")
+                .usableCash(new BigDecimal("480"))
+                .grossDebt(new BigDecimal("195"))
+                .minorityAdjustment(BigDecimal.ZERO)
+                .nonCoreAssets(BigDecimal.ZERO)
+                .dilutedShares(new BigDecimal("1000"))
+                .version("test-v2")
+                .build());
         assertThat(computed.getBusinessStatus()).isEqualTo("COMPUTED");
         assertThat(computed.getValuationRange()).isNotNull();
         assertThat(computed.getDcfValuation().getBaseCase().getEquityValue()).isNotNull();

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Spin, Tabs, Descriptions, Table, Tag, Button } from 'antd'
 import { taskAPI } from '../services/api'
+import FinancialMetricsTable, { formatMetric, sourceLabel } from '../components/FinancialMetricsTable'
 
 const { TabPane } = Tabs
 
@@ -97,37 +98,7 @@ function ReportView() {
           <TabPane tab="财务指标" key="2">
             {report.metrics ? (
               <Card>
-                <h3>核心指标</h3>
-                <Descriptions bordered column={2}>
-                  <Descriptions.Item label="营业收入">
-                    {report.metrics.coreMetrics?.revenue || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="归母净利润">
-                    {report.metrics.coreMetrics?.netProfit || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="扣非归母净利润">
-                    {report.metrics.coreMetrics?.netProfitDeducted || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="经营现金流">
-                    {report.metrics.coreMetrics?.operatingCashFlow || '-'}
-                  </Descriptions.Item>
-                </Descriptions>
-
-                <h3 style={{ marginTop: 24 }}>财务比率</h3>
-                <Descriptions bordered column={2}>
-                  <Descriptions.Item label="毛利率">
-                    {report.metrics.ratios?.grossMargin || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="净利率">
-                    {report.metrics.ratios?.netMargin || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="加权平均 ROE">
-                    {report.metrics.ratios?.disclosedWeightedRoe || report.metrics.ratios?.roe || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="ROA">
-                    {report.metrics.ratios?.roa || '-'}
-                  </Descriptions.Item>
-                </Descriptions>
+                <FinancialMetricsTable metrics={report.metrics} />
               </Card>
             ) : (
               <p>暂无数据</p>
@@ -225,7 +196,7 @@ function ReportView() {
                     <p>{report.valuation.valuationRange.applicabilityNote}</p>
                   </>
                 ) : (
-                  <p>估值区间未计算</p>
+                  <p>估值{report.valuation.businessStatus === 'BLOCKED_BY_DATA_QUALITY' ? '因数据质量阻断' : '区间未计算'}：{report.valuation.blockReason || '缺少完整输入'}</p>
                 )}
                 <Table
                   style={{ marginTop: 16 }}
@@ -236,7 +207,7 @@ function ReportView() {
                   columns={[
                     { title: '参数', dataIndex: 'parameter' },
                     { title: '取值', dataIndex: 'value' },
-                    { title: '来源', dataIndex: 'source' },
+                    { title: '来源', dataIndex: 'source', render: sourceLabel },
                     { title: '依据', dataIndex: 'rationale' },
                   ]}
                 />

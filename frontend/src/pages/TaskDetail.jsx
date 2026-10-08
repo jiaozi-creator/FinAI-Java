@@ -3,31 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Descriptions, Tag, Progress, Button, Space, Spin, message, Table, Alert, Popover } from 'antd'
 import { ReloadOutlined, FileTextOutlined, StopOutlined, MessageOutlined } from '@ant-design/icons'
 import { taskAPI, auditAPI } from '../services/api'
+import FinancialMetricsTable, { formatMetric, sourceLabel } from '../components/FinancialMetricsTable'
 import PageHeader from '../components/PageHeader'
+import ValuationInputForm from '../components/ValuationInputForm'
 
-function fmtAmount(value) {
-  if (value === null || value === undefined || value === '') return '未提取'
-  const num = Number(value)
-  if (Number.isNaN(num)) return String(value)
-  return num.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
-}
-
-function fmtPct(value) {
-  if (value === null || value === undefined || value === '') return '未提取'
-  const num = Number(value)
-  if (Number.isNaN(num)) return String(value)
-  return `${(num * 100).toFixed(2)}%`
-}
-
-function sourceLabel(source) {
-  const map = {
-    extract: '事实提取',
-    formula: '公式假设',
-    user: '用户给定',
-    llm_suggest: '模型建议',
-  }
-  return map[source] || source || '未标注'
-}
+const fmtAmount = (value) => formatMetric(value, { unit: '元' })
+const fmtPct = (value) => formatMetric(value, { unit: '%' }, 'pct')
 
 function TaskDetail() {
   const { taskId } = useParams()
@@ -172,30 +153,6 @@ function TaskDetail() {
   const core = metrics?.coreMetrics || {}
   const yoy = metrics?.yoyGrowth || {}
   const ratios = metrics?.ratios || {}
-  const metricRows = [
-    ['营业收入', core.revenue, yoy.revenueGrowth, 'revenue'],
-    ['归母净利润', core.netProfit, yoy.netProfitGrowth, 'net_profit'],
-    ['扣非净利润', core.netProfitDeducted, yoy.netProfitDeductedGrowth, 'net_profit_deducted'],
-    ['经营活动现金流', core.operatingCashFlow, yoy.operatingCashFlowGrowth, 'operating_cash_flow'],
-    ['自由现金流', core.freeCashFlow, null, 'capex'],
-    ['资产总计', core.totalAssets, null, 'total_assets'],
-    ['负债合计', core.totalLiabilities, null, 'total_liabilities'],
-    ['归母权益', core.netAssets, null, 'net_assets'],
-    ['少数股东权益', core.minorityInterest, null, 'minority_interest'],
-    ['期末总股本', core.sharesOutstanding, null, 'shares_outstanding'],
-    ['基本每股收益', core.basicEps, null, 'basic_eps'],
-  ].map(([name, amount, growth, fieldId]) => ({ name, amount, growth, fieldId }))
-
-  const ratioRows = [
-    ['毛利率', ratios.grossMargin, 'pct'],
-    ['净利率', ratios.netMargin, 'pct'],
-    ['ROE（期末权益）', ratios.roe, 'pct'],
-    ['ROA', ratios.roa, 'pct'],
-    ['资产负债率', ratios.assetLiabilityRatio, 'pct'],
-    ['流动比率', ratios.currentRatio, 'multiple'],
-    ['经营现金流/归母净利润', ratios.ocfToNetProfit, 'multiple'],
-  ].map(([name, value, kind]) => ({ name, value, kind }))
-
   const sensitivity = valuation?.sensitivityAnalysis
   const sensitivityColumns = [
     { title: 'WACC \\ 永续g', dataIndex: 'wacc', width: 120 },
@@ -294,6 +251,8 @@ function TaskDetail() {
             columns={[
               { title: '阶段', dataIndex: 'name' },
               { title: '状态', dataIndex: 'status', render: (value) => getStatusTag(value) },
+              { title: '业务状态', dataIndex: 'businessStatus' },
+              { title: '业务原因/复核问题', dataIndex: 'businessReason' },
               { title: '开始', dataIndex: 'startedAt', render: (value) => value ? new Date(value).toLocaleString() : '-' },
               { title: '结束', dataIndex: 'finishedAt', render: (value) => value ? new Date(value).toLocaleString() : '-' },
               { title: '错误码', dataIndex: 'errorCode', render: (value) => value || '-' },
@@ -308,34 +267,8 @@ function TaskDetail() {
 
       {task.status === 'COMPLETED' && !resultNote && (
         <Space direction="vertical" size={16} style={{ width: '100%', marginTop: 16 }}>
-          <Card title={`财务指标（${metrics?.unit || '单位未标注'}，同比；环比未计算）`}>
-            <Table
-              size="small"
-              pagination={false}
-              rowKey="fieldId"
-              dataSource={metricRows}
-              columns={[
-                { title: '科目', dataIndex: 'name' },
-                { title: '本期', dataIndex: 'amount', render: fmtAmount },
-                { title: '同比', dataIndex: 'growth', render: fmtPct },
-                { title: '证据', dataIndex: 'fieldId', render: evidencePopover },
-              ]}
-            />
-            <Table
-              style={{ marginTop: 16 }}
-              size="small"
-              pagination={false}
-              rowKey="name"
-              dataSource={ratioRows}
-              columns={[
-                { title: '比率', dataIndex: 'name' },
-                {
-                  title: '数值',
-                  dataIndex: 'value',
-                  render: (value, record) => (record.kind === 'pct' ? fmtPct(value) : fmtAmount(value)),
-                },
-              ]}
-            />
+          <Card title={`财务指标（${metrics?.unit || '单位未标注'}；同比；环比未计算）`}>
+            <FinancialMetricsTable metrics={metrics} />
           </Card>
 
           {(metrics?.nonRecurringItems || []).length > 0 && (
@@ -370,8 +303,8 @@ function TaskDetail() {
                   <p>{anomaly.description}</p>
                   <p>
                     规则 {anomaly.ruleTriggered} · 版本 {anomaly.ruleVersion} · 实际值{' '}
-                    {anomaly.ruleTriggered === 'accounting_policy_mention' ? '未提取' : fmtPct(anomaly.actualValue)} · 阈值{' '}
-                    {anomaly.ruleTriggered === 'accounting_policy_mention' ? '未提取' : fmtPct(anomaly.threshold)}
+                    {anomaly.ruleTriggered === 'accounting_policy_mention' ? '不适用' : fmtPct(anomaly.actualValue)} · 阈值{' '}
+                    {anomaly.ruleTriggered === 'accounting_policy_mention' ? '不适用' : fmtPct(anomaly.threshold)}
                   </p>
                   <p>{anomaly.verificationDetails}</p>
                   <p>{anomaly.recommendation}</p>
@@ -386,11 +319,12 @@ function TaskDetail() {
           </Card>
 
           <Card title="估值">
+            <ValuationInputForm taskId={taskId} disabled={task.status !== 'COMPLETED' && task.status !== 'FAILED'} />
             {!valuation?.valuationRange ? (
               <Alert
                 type="warning"
-                message="估值区间未计算"
-                description={(valuation?.assumptions || []).map((item) => `${item.parameter}：${item.rationale}`).join(' ') || '缺少经营现金流或历史增速。'}
+                message={valuation?.businessStatus === 'BLOCKED_BY_DATA_QUALITY' ? '估值因数据质量阻断' : '估值区间未计算'}
+                description={[valuation?.blockReason, ...(valuation?.assumptions || []).map((item) => `${item.parameter}：${item.rationale}`)].filter(Boolean).join(' ') || '缺少经营现金流或历史增速。'}
               />
             ) : (
               <>

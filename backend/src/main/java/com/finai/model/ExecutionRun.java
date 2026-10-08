@@ -23,4 +23,8 @@ public class ExecutionRun {
     private LocalDateTime finishedAt;
     private String errorCode;
     private String ruleVersion;
+    @Lob
+    private String valuationInputsJson;
+    @Lob
+    private String snapshotJson;
 }

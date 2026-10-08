@@ -5,6 +5,7 @@ import com.finai.model.dto.TaskRequestDTO;
 import com.finai.repository.AnalysisSnapshotRepository;
 import com.finai.repository.AnalysisTaskRepository;
 import com.finai.repository.EvidenceRepository;
+import com.finai.repository.ValuationConfirmationRepository;
 import com.finai.service.impl.AnalysisServiceImpl;
 import com.finai.service.impl.IndustryComparisonServiceImpl;
 import com.finai.service.impl.RiskWarningServiceImpl;
@@ -46,7 +47,8 @@ class P0SafetyTest {
     void rejectsMissingAndDisguisedPdfBeforeWritingTask() {
         AnalysisServiceImpl service = new AnalysisServiceImpl(mock(AnalysisTaskRepository.class),
                 mock(EvidenceRepository.class), mock(AnalysisSnapshotRepository.class),
-                mock(AuditLogService.class), null, new ObjectMapper(), null);
+                mock(AuditLogService.class), null, new ObjectMapper(), null,
+                mock(ValuationConfirmationRepository.class));
         TaskRequestDTO request = TaskRequestDTO.builder().companyCode("600519").build();
         assertThatThrownBy(() -> service.createTask(request, null)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> service.createTask(request,

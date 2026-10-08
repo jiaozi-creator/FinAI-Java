@@ -9,6 +9,7 @@ import com.finai.analysis.StatementExtract;
 import com.finai.analysis.StatementExtractor;
 import com.finai.analysis.ValuationEngine;
 import com.finai.agent.TaskOrchestrator;
+import com.finai.agent.ReviewAgent;
 import com.finai.model.AnalysisSnapshot;
 import com.finai.model.AnalysisTask;
 import com.finai.model.dto.AnalysisReportDTO;
@@ -41,7 +42,9 @@ public class TaskExecutionWorker {
     private final ReportComposer reportComposer;
     private final ObjectMapper objectMapper;
     private final TaskOrchestrator orchestrator;
+    private final ReviewAgent reviewAgent;
     private final TaskStateService taskState;
+    private final ValuationInputService valuationInputs;
     private final java.util.Set<String> activeTasks = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     @Async
@@ -63,6 +66,9 @@ public class TaskExecutionWorker {
                 throw new IllegalStateException("没有读到上传的财报文件");
             }
             runId = orchestrator.start(taskId, task.getUploadedFilePath());
+            var confirmation = valuationInputs.latest(taskId);
+            var parameters = valuationInputs.parameters(confirmation);
+            orchestrator.freezeValuationInputs(runId, objectMapper.writeValueAsString(confirmation));
             if (stopped(taskId)) {
                 orchestrator.finish(runId, "CANCELLED", null);
                 return;
@@ -110,7 +116,7 @@ public class TaskExecutionWorker {
             if (task.getAnalysisType() == AnalysisTask.AnalysisType.FULL
                     || task.getAnalysisType() == AnalysisTask.AnalysisType.VALUATION_ONLY) {
                 long valueStart = System.currentTimeMillis();
-                valuation = orchestrator.stage(executionId, "VALUATION", () -> valuationEngine.evaluate(extract.getLines(), metrics));
+                valuation = orchestrator.stage(executionId, "VALUATION", () -> valuationEngine.evaluate(extract.getLines(), metrics, parameters));
                 auditLogService.logToolInvocation(taskId, "valuation.dcf", task.getAnalysisType().name(),
                         valuation.getValuationRange() == null ? "range=absent" : "range=present",
                         System.currentTimeMillis() - valueStart);
@@ -123,6 +129,20 @@ public class TaskExecutionWorker {
             update(taskId, 92, "生成报告");
             ValuationResultDTO completedValuation = valuation;
             AnalysisReportDTO report = orchestrator.stage(executionId, "REPORT", () -> reportComposer.compose(task, extract, metrics, checks, anomalies, completedValuation, startedAt));
+            update(taskId, 96, "复核报告");
+            var review = orchestrator.stage(executionId, "REVIEW", () -> reviewAgent.review(report));
+            report.setReviewResult(review);
+            report.setBusinessStatus("ok".equals(review.getStatus()) ? "PASSED" : "NEEDS_REVIEW");
+            if (!"ok".equals(review.getStatus())) {
+                report.setConclusion("报告复核发现问题，正式结论被阻断：" + String.join("；", review.getWarnings()));
+                if (valuation != null) {
+                    valuation.setBusinessStatus("BLOCKED_BY_DATA_QUALITY");
+                    valuation.setBlockReason("报告复核未通过：" + String.join("；", review.getWarnings()));
+                    valuation.setValuationRange(null);
+                    valuation.setDcfValuation(null);
+                    valuation.setSensitivityAnalysis(null);
+                }
+            }
             if (stopped(taskId)) {
                 orchestrator.finish(runId, "CANCELLED", null);
                 return;
@@ -139,6 +159,7 @@ public class TaskExecutionWorker {
                 orchestrator.finish(runId, "CANCELLED", null);
                 return;
             }
+            orchestrator.freezeSnapshot(runId, objectMapper.writeValueAsString(snapshot));
             auditLogService.logTaskCompletion(taskId);
             orchestrator.finish(runId, "COMPLETED", null);
             log.info("Pipeline done: {}", taskId);

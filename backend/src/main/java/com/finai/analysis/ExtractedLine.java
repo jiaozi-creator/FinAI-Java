@@ -15,6 +15,7 @@ public class ExtractedLine {
     String fieldName;
     BigDecimal current;
     BigDecimal prior;
+    BigDecimal disclosedGrowth;
     String unit;
     String scope;
     Integer page;

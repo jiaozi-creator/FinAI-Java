@@ -35,6 +35,18 @@ public class AnalysisTaskController {
     private final AnalysisService analysisService;
     private final DemoTaskService demoTaskService;
     private final TaskOrchestrator orchestrator;
+    private final com.finai.service.ValuationInputService valuationInputs;
+
+    @GetMapping("/{taskId}/valuation-inputs")
+    public ResponseEntity<com.finai.model.ValuationConfirmation> valuationInputs(@PathVariable String taskId) {
+        return ResponseEntity.ok(valuationInputs.latest(taskId));
+    }
+
+    @PostMapping("/{taskId}/valuation-inputs/confirm")
+    public com.finai.model.ValuationConfirmation confirmValuationInputs(@PathVariable String taskId,
+            @RequestBody com.finai.service.ValuationInputService.ConfirmationRequest request) {
+        return valuationInputs.confirm(taskId, request);
+    }
 
     @GetMapping("/{taskId}/runs")
     public List<ExecutionRun> runs(@PathVariable String taskId) {

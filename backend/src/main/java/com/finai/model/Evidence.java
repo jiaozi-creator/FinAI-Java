@@ -128,7 +128,8 @@ public class Evidence {
     /**
      * 原始文本片段
      */
-    @Column(name = "snippet", length = 1000)
+    @Lob
+    @Column(name = "snippet")
     private String snippet;
 
     /**

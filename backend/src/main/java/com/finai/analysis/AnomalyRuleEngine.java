@@ -177,17 +177,18 @@ public class AnomalyRuleEngine {
                 .dataQualityStatus(confirmed || none ? "VALID" : "INPUT_INCOMPLETE")
                 .inputFields(List.of("accounting_policy"))
                 .affectedMetrics(List.of())
-                .evidence(List.of(EvidenceDTO.builder()
+                .evidence(notes.stream().filter(note -> note == selected || "CONFIRMED_CHANGE".equals(note.getJudgement()))
+                        .map(note -> EvidenceDTO.builder()
                         .fieldId("accounting_policy")
                         .fieldName("会计政策变更附注")
-                        .page(selected.getPage())
-                        .snippet(selected.getSnippet())
+                        .page(note.getPage())
+                        .snippet(note.getSnippet())
                         .confidence(confirmed ? 0.7 : 0.4)
-                        .build()))
+                        .build()).toList())
                 .verificationStatus(confirmed
                         ? AnomalySignalDTO.VerificationStatus.CONFIRMED
                         : AnomalySignalDTO.VerificationStatus.INCONCLUSIVE)
-                .verificationDetails("页码 " + selected.getPage() + "，判断=" + selected.getJudgement())
+                .verificationDetails("是否发生=" + selected.getJudgement() + "；重要性及同比影响仍需按调整金额复核，不能由发生变更直接推定重大风险")
                 .recommendation(confirmed
                         ? "先量化追溯调整对同比的影响；影响显著时才重算，影响不显著时在报告中披露差异。"
                         : "先取得准则附注和比较期调整金额，再决定是否重算同比。")

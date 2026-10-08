@@ -198,6 +198,7 @@ public class MetricCalculator {
 
     private static BigDecimal growth(Map<String, ExtractedLine> byField, String fieldId) {
         ExtractedLine line = byField.get(fieldId);
+        if (line != null && "basic_eps".equals(fieldId) && line.getDisclosedGrowth() != null) return line.getDisclosedGrowth();
         if (line == null || line.getCurrent() == null || line.getPrior() == null) {
             return null;
         }
@@ -262,14 +263,57 @@ public class MetricCalculator {
         addFormulaDetail(details, "asset_liability_ratio", ratios.getAssetLiabilityRatio(), "负债合计/资产总计", List.of("total_liabilities", "total_assets"), byField, period, "%");
         addFormulaDetail(details, "current_ratio", ratios.getCurrentRatio(), "流动资产合计/流动负债合计", List.of("current_assets", "current_liabilities"), byField, period, "倍");
         addFormulaDetail(details, "ocf_to_net_profit", ratios.getOcfToNetProfit(), "经营活动现金流/归母净利润", List.of("operating_cash_flow", "net_profit"), byField, period, "倍");
+        for (String id : List.of("revenue_total", "revenue", "net_profit", "net_profit_deducted", "operating_cash_flow", "total_assets", "total_liabilities", "net_assets", "minority_interest", "shares_outstanding", "basic_eps")) {
+            ExtractedLine line = byField.get(id);
+            BigDecimal value = growth(byField, id);
+            String reason = value != null ? null : line == null || line.getCurrent() == null ? "缺少本期值"
+                    : line.getPrior() == null ? "缺少同口径上期值" : line.getPrior().signum() == 0 ? "上期值为零，同比无法定义"
+                    : !"consolidated".equals(line.getScope()) ? "非合并报表范围" : "期间不是可比年度或年末时点";
+            String status = value != null ? "VALUE_AVAILABLE" : reason.contains("范围") ? "SCOPE_MISMATCH"
+                    : reason.contains("期间") ? "PERIOD_MISMATCH" : reason.contains("为零") ? "NOT_APPLICABLE" : "INPUT_INCOMPLETE";
+            List<EvidenceDTO> refs = line == null ? List.of() : periodEvidence(line, period);
+            var result = detail(value, status, reason, "(本期－调整后上期)/abs(调整后上期)", List.of(id), line == null ? "unknown" : line.getScope(), period, "%", refs);
+            result.setSource(line != null && "basic_eps".equals(id) && line.getDisclosedGrowth() != null ? "extract" : "formula");
+            result.setDisplayScale(2);
+            details.put(id + "_growth", result);
+        }
+        addFormulaDetail(details, "simple_free_cash_flow_growth", simpleFreeCashFlowGrowth(byField), "(本期CFO-Capex－上期CFO+上期Capex)/abs(上期CFO-Capex)",
+                List.of("operating_cash_flow", "capex"), byField, period, "%");
+        var fcfGrowth = details.get("simple_free_cash_flow_growth");
+        if (fcfGrowth.getValue() == null && byField.containsKey("operating_cash_flow") && byField.containsKey("capex")) {
+            boolean missingPrior = byField.get("operating_cash_flow").getPrior() == null || byField.get("capex").getPrior() == null;
+            if (missingPrior) { fcfGrowth.setStatus("INPUT_INCOMPLETE"); fcfGrowth.setMissingReason("缺少上期经营现金流或资本开支"); }
+            else if (byField.get("operating_cash_flow").getPrior().subtract(byField.get("capex").getPrior()).signum() == 0) {
+                fcfGrowth.setStatus("NOT_APPLICABLE"); fcfGrowth.setMissingReason("上期简式自由现金流为零，同比无法定义");
+            }
+        }
+        details.forEach((id, result) -> {
+            if (result.getDisplayScale() == null) result.setDisplayScale("shares_outstanding".equals(id) ? 0
+                    : "basic_eps".equals(id) && result.getValue() != null ? Math.max(2, result.getValue().scale()) : 2);
+            if (result.getSource() == null) result.setSource(result.getFormula() == null || "disclosed_weighted_roe".equals(id) ? "extract" : "formula");
+            result.setEvidenceRefs(result.getInputs().stream().map(byField::get).filter(java.util.Objects::nonNull)
+                    .flatMap(line -> periodEvidence(line, period).stream()).toList());
+        });
         return details;
     }
 
     private void addFormulaDetail(Map<String, FinancialMetricsDTO.MetricResult> details, String id, BigDecimal value, String formula,
                                   List<String> inputs, Map<String, ExtractedLine> byField, String period, String unit) {
         List<ExtractedLine> found = inputs.stream().map(byField::get).filter(java.util.Objects::nonNull).toList();
-        String reason = value != null ? null : found.size() < inputs.size() ? "INPUT_INCOMPLETE" : "SCOPE_PERIOD_OR_UNIT_MISMATCH";
-        details.put(id, detail(value, value == null ? reason : "VALUE_AVAILABLE", reason, formula, inputs,
+        String status = "VALUE_AVAILABLE";
+        String reason = null;
+        if (value == null) {
+            status = "INPUT_INCOMPLETE";
+            reason = "缺少公式输入：" + inputs.stream().filter(key -> byField.get(key) == null || byField.get(key).getCurrent() == null).collect(Collectors.joining("、"));
+            if (found.size() == inputs.size()) {
+                if (found.stream().anyMatch(line -> !"consolidated".equals(line.getScope()))) { status = "SCOPE_MISMATCH"; reason = "公式输入不是同一合并范围"; }
+                else if (found.stream().map(ExtractedLine::getUnit).distinct().count() > 1) { status = "UNIT_MISMATCH"; reason = "公式输入单位不一致"; }
+                else if (found.stream().anyMatch(line -> "quarterly".equals(line.getPeriodType()))) { status = "PERIOD_MISMATCH"; reason = "公式输入包含季度或非可比期间"; }
+                else if ((id.equals("roa") || id.equals("average_equity_roe")) && found.get(found.size() - 1).getPrior() == null) reason = "缺少期初余额，不能计算平均值";
+                else { status = "NOT_APPLICABLE"; reason = "分母为零或缺少可比输入，无法计算"; }
+            }
+        }
+        details.put(id, detail(value, status, reason, formula, inputs,
                 found.isEmpty() ? "unknown" : found.get(0).getScope(), period, unit, found.stream().map(this::evidence).toList()));
     }
 
@@ -284,5 +328,15 @@ public class MetricCalculator {
         return EvidenceDTO.builder().fieldId(line.getFieldId()).fieldName(line.getFieldName())
                 .value(line.getCurrent() == null ? null : line.getCurrent().toPlainString()).unit(line.getUnit())
                 .page(line.getPage()).snippet(line.getSnippet()).confidence(line.getConfidence()).sourceFile(line.getSourceFile()).build();
+    }
+
+    private List<EvidenceDTO> periodEvidence(ExtractedLine line, String period) {
+        EvidenceDTO current = evidence(line);
+        current.setPeriod(period);
+        if (line.getPrior() == null) return List.of(current);
+        EvidenceDTO prior = evidence(line);
+        prior.setPeriod(Periods.prior(period));
+        prior.setValue(line.getPrior().toPlainString());
+        return List.of(current, prior);
     }
 }
