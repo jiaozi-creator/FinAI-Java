@@ -1,0 +1,21 @@
+# 已实现的异常规则。阈值由 AnomalyRuleEngine 读取。
+# 未实现的规则不要写进这个文件，避免看起来像已经在跑。
+version: "2026.1"
+
+rules:
+  - id: non_recurring_gap
+    name: 非经常性损益占比高
+    threshold: 0.20
+    high_threshold: 0.50
+    expression: "abs(net_profit - net_profit_deducted) / abs(net_profit)"
+    note: "差额来自主表两个净利润口径，不是非经常性损益附注合计数。"
+
+  - id: profit_cashflow_divergence
+    name: 利润与现金流背离
+    coverage_threshold: 0.50
+    expression: "operating_cash_flow / net_profit"
+    note: "归母净利润为正，且出现符号背离、覆盖倍数低于阈值，或利润同比上升同时经营现金流同比下降。"
+
+  - id: accounting_policy_mention
+    name: 会计政策或估计变更
+    note: "只根据附注措辞判断确认变更、明确无重大变更或仅被提及。没有单独阈值。"

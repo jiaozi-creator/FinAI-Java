@@ -19,6 +19,12 @@ public class LangChain4jConfig {
     @Value("${finai.llm.provider:aliyun}")
     private String llmProvider;
 
+    @Value("${finai.llm.model:qwen-plus}")
+    private String modelName;
+
+    @Value("${finai.llm.temperature:0.0}")
+    private double temperature;
+
     @Value("${finai.llm.anthropic.api-key:}")
     private String anthropicApiKey;
 
@@ -113,6 +119,7 @@ public class LangChain4jConfig {
         } else {
             throw new IllegalStateException("Unknown LLM provider: " + llmProvider);
         }
+        return createMockModel();
     }
 
     private void requireKey(String key, String variable) {

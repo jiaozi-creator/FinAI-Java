@@ -91,6 +91,65 @@ class StatementPipelineTest {
     }
 
     @Test
+    void prefersConsolidatedStatementOverParentSummaryAndNotes() {
+        String text = """
+                单位：元
+                主要会计数据
+                归属于上市公司股
+                101,035,276
+                东的扣除非经常性 -39,312,271.78 -279,702,121.97 85.94
+                .19
+                损益的净利润
+                合并资产负债表
+                货币资金 1 1,088,855,303.96 1,006,282,974.26
+                存货 10 1,781,225,167.08 1,643,949,298.23
+                资产总计 9,627,422,735.04 9,622,769,572.52
+                负债合计 6,086,960,046.31 5,936,747,650.29
+                归属于母公司所有者权益
+                3,499,230,196.18 3,628,152,636.36
+                （或股东权益）合计
+                少数股东权益 41,232,492.55 57,869,285.87
+                母公司资产负债表
+                货币资金 604,196,292.37 460,873,222.05
+                存货 317,311,184.44 320,547,801.76
+                合并利润表
+                其中：营业收入 61 8,912,075,395.97 8,449,386,211.83
+                五、净利润（净亏损以“－”号填列） -20,489,710.90 -178,963,052.55
+                1.归属于母公司股东的净利润
+                （净亏损以“-”号填列）
+                -9,822,497.95 -151,420,324.40
+                （一）基本每股收益(元/股) -0.02 -0.27
+                母公司利润表
+                四、净利润（净亏损以“－”号填列） 251,815,440.50 526,783,089.28
+                合并现金流量表
+                经营活动产生的现金流量净额 883,073,254.93 963,903,027.07
+                购买日公允价值 购买日账面价值
+                货币资金 2,839,279.97 2,839,279.97
+                存货 3,385,276.10 3,385,276.10
+                减：少数股东权益 -725,835.34 -725,835.34
+                """;
+
+        StatementExtract extract = extractor.extractPages(List.of(new PageText(93, text)), "603313-layout.txt");
+        var byId = extract.getLines().stream().collect(java.util.stream.Collectors.toMap(
+                ExtractedLine::getFieldId, line -> line, (a, b) -> a));
+
+        assertThat(byId.get("net_profit").getCurrent()).isEqualByComparingTo("-9822497.95");
+        assertThat(byId.get("net_profit").getPrior()).isEqualByComparingTo("-151420324.40");
+        assertThat(byId.get("net_profit").getScope()).isEqualTo("consolidated");
+        assertThat(byId.get("net_profit_deducted").getCurrent()).isEqualByComparingTo("-39312271.78");
+        assertThat(byId.get("net_profit_deducted").getPrior()).isEqualByComparingTo("-279702121.97");
+        assertThat(byId.get("cash").getCurrent()).isEqualByComparingTo("1088855303.96");
+        assertThat(byId.get("cash").getScope()).isEqualTo("consolidated");
+        assertThat(byId.get("inventory").getCurrent()).isEqualByComparingTo("1781225167.08");
+        assertThat(byId.get("minority_interest").getCurrent()).isEqualByComparingTo("41232492.55");
+        assertThat(byId.get("minority_interest").getScope()).isEqualTo("consolidated");
+        assertThat(byId.get("net_assets").getCurrent()).isEqualByComparingTo("3499230196.18");
+        assertThat(byId.get("net_assets").getScope()).isEqualTo("consolidated");
+        assertThat(byId.get("basic_eps").getCurrent()).isEqualByComparingTo("-0.02");
+        assertThat(byId.get("revenue").getCurrent()).isEqualByComparingTo("8912075395.97");
+    }
+
+    @Test
     void skipsValuationWhenCashFlowMissing() {
         String text = """
                 单位：元

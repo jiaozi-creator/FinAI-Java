@@ -6,22 +6,14 @@ import com.finai.model.dto.AnalysisReportDTO;
 import com.finai.model.dto.AnomalySignalDTO;
 import com.finai.model.dto.FinancialMetricsDTO;
 import com.finai.model.dto.ValuationResultDTO;
-import com.finai.service.AuditLogService;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.ChatLanguageModel;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ReportComposer {
@@ -40,7 +32,11 @@ public class ReportComposer {
                                      List<AnomalySignalDTO> anomalies,
                                      ValuationResultDTO valuation,
                                      long startedAtMs) {
-        Narrative narrative = narrative(task, metrics, checks, anomalies, valuation);
+        String growth = growthText(metrics);
+        String profit = profitText(metrics);
+        String cash = cashText(metrics, anomalies);
+        String overall = overallText(checks, anomalies, valuation);
+        SkillNarrator.Result narrative = skillNarrator.narrate(task, growth, profit, cash, overall, metrics, checks, anomalies, valuation, extract);
         List<AnalysisReportDTO.RiskFactor> risks = new ArrayList<>();
         for (AnomalySignalDTO anomaly : anomalies) {
             risks.add(AnalysisReportDTO.RiskFactor.builder()
@@ -90,12 +86,17 @@ public class ReportComposer {
                 .citations(citations)
                 .conclusion(conclusion)
                 .executionSummary(AnalysisReportDTO.ExecutionSummary.builder()
-                        .llmModel(narrative.llmUsed() ? modelName : "未调用")
-                        .llmCallCount(narrative.llmUsed() ? 1 : 0)
+                        .llmModel(narrative.llmCalls() > 0 ? llmRuntime.getModel() : "未调用")
+                        .llmCallCount(narrative.llmCalls())
+                        .temperature(llmRuntime.getTemperature())
+                        .leavesMachine(narrative.llmCalls() > 0 && llmRuntime.leavesMachine())
                         .executionTimeMs(System.currentTimeMillis() - startedAtMs)
                         .dataVersion(AnomalyRuleEngine.RULE_VERSION)
-                        .configVersion("field-dict-2026.1")
-                        .toolsUsed(List.of("pdf.parse", "metric.calculate", "articulation.check", "anomaly.rules", "valuation.dcf"))
+                        .configVersion(AnalysisConfig.get().configVersion())
+                        .promptVersion(narrative.promptVersion())
+                        .skillVersion(narrative.skillVersion())
+                        .fileSha256(extract.getSha256())
+                        .toolsUsed(List.of("file.access", "pdf.parse", "metric.calculate", "articulation.check", "anomaly.rules", "valuation.dcf"))
                         .generatedAt(LocalDateTime.now().toString())
                         .build())
                 .build();
@@ -204,15 +205,5 @@ public class ReportComposer {
             return "未提取";
         }
         return value.multiply(new BigDecimal("100")).setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() + "%";
-    }
-
-    private static String truncate(String value, int max) {
-        if (value == null || value.length() <= max) {
-            return value;
-        }
-        return value.substring(0, max);
-    }
-
-    private record Narrative(String growth, String profit, String cash, String overall, boolean llmUsed) {
     }
 }

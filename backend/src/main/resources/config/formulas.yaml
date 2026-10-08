@@ -1,0 +1,57 @@
+# 与 MetricCalculator、ValuationEngine 一致的公式说明。比率是小数，不是百分数。
+version: "2026.1"
+
+formulas:
+  - id: yoy_growth
+    implemented: true
+    expression: "(current - prior) / abs(prior)"
+    note: "上期缺失或为 0 时不计算。"
+
+  - id: qoq_growth
+    implemented: true
+    expression: "单份报告不计算环比"
+    note: "没有上期季度序列时结果保持空。"
+
+  - id: gross_margin
+    implemented: true
+    expression: "(revenue - operating_cost) / revenue"
+    note: "分子分母单位必须相同，否则不计算。"
+
+  - id: net_margin
+    implemented: true
+    expression: "net_profit / revenue"
+
+  - id: roe
+    implemented: true
+    expression: "net_profit / net_assets"
+    note: "分母是期末归母权益，不是期初期末平均权益。"
+
+  - id: roa
+    implemented: true
+    expression: "net_profit / total_assets"
+    note: "分母是期末总资产。"
+
+  - id: asset_liability_ratio
+    implemented: true
+    expression: "total_liabilities / total_assets"
+
+  - id: current_ratio
+    implemented: true
+    expression: "current_assets / current_liabilities"
+
+  - id: ocf_to_net_profit
+    implemented: true
+    expression: "operating_cash_flow / net_profit"
+
+  - id: fcff
+    implemented: true
+    expression: "operating_cash_flow - capex"
+    note: "资本开支未抽到时，估值假设会写明暂用经营现金流代替，不把代替值说成已扣资本开支。"
+
+  - id: pe_ratio
+    implemented: false
+    note: "没有市价，不计算。"
+
+  - id: relative_valuation
+    implemented: false
+    note: "没有可比公司财务和市价，不计算。"

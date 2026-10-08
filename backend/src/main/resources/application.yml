@@ -109,10 +109,9 @@ finai:
   pdf:
     parser-engine: ${PDF_PARSER_ENGINE:pdfbox}
 
-  # OCR Configuration
+  # OCR 未实现。流水线只用 PDFBox 文本层，不要把这项打开当成已接入。
   ocr:
-    enabled: ${OCR_ENABLED:false}
-    language: ${OCR_LANGUAGE:chi_sim}
+    enabled: false
 
   # Cache Configuration
   cache:

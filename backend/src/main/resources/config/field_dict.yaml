@@ -1,0 +1,83 @@
+# 主表抽取字段。别名按行首匹配，长别名优先。运行时由 AnalysisConfig 加载。
+version: "2026.1"
+
+fields:
+  - id: revenue
+    name: 营业收入
+    aliases: ["营业总收入", "营业收入"]
+
+  - id: operating_cost
+    name: 营业成本
+    aliases: ["营业成本"]
+
+  - id: net_profit
+    name: 归母净利润
+    aliases: ["归属于上市公司股东的净利润", "归属于母公司所有者的净利润", "归属于母公司股东的净利润", "净利润"]
+
+  - id: net_profit_deducted
+    name: 扣非净利润
+    aliases: ["归属于上市公司股东的扣除非经常性损益的净利润", "扣除非经常性损益后的净利润", "扣除非经常性损益的净利润"]
+
+  - id: operating_cash_flow
+    name: 经营活动现金流
+    aliases: ["经营活动产生的现金流量净额"]
+
+  - id: capex
+    name: 资本开支
+    aliases: ["购建固定资产、无形资产和其他长期资产支付的现金"]
+
+  - id: total_assets
+    name: 资产总计
+    aliases: ["资产总计", "资产合计", "总资产"]
+
+  - id: total_liabilities
+    name: 负债合计
+    aliases: ["负债合计", "负债总计"]
+
+  - id: net_assets
+    name: 归母权益
+    aliases: ["归属于上市公司股东的净资产", "归属于母公司所有者权益合计", "归属于母公司所有者权益（或股东权益）合计", "归属于母公司股东权益合计", "所有者权益合计", "股东权益合计"]
+
+  - id: cash
+    name: 货币资金
+    aliases: ["货币资金"]
+
+  - id: accounts_receivable
+    name: 应收账款
+    aliases: ["应收账款"]
+
+  - id: inventory
+    name: 存货
+    aliases: ["存货"]
+
+  - id: goodwill
+    name: 商誉
+    aliases: ["商誉"]
+
+  - id: current_assets
+    name: 流动资产合计
+    aliases: ["流动资产合计"]
+
+  - id: current_liabilities
+    name: 流动负债合计
+    aliases: ["流动负债合计"]
+
+  - id: short_term_debt
+    name: 短期借款
+    aliases: ["短期借款"]
+
+  - id: long_term_debt
+    name: 长期借款
+    aliases: ["长期借款"]
+
+  - id: minority_interest
+    name: 少数股东权益
+    aliases: ["少数股东权益"]
+
+  - id: shares_outstanding
+    name: 期末总股本
+    aliases: ["期末总股本"]
+
+  - id: basic_eps
+    name: 基本每股收益
+    aliases: ["基本每股收益（元／股）", "基本每股收益（元/股）", "基本每股收益"]

@@ -1,0 +1,36 @@
+# 金标准：人造短文本。用来确认计分程序本身是对的。
+# 不是上市公司年报。下一份请换真实文本层 PDF，并逐项手填 current / prior。
+id: demo-statement
+file: backend/src/main/resources/samples/demo-statement.txt
+unit: 万元
+scope: consolidated
+fields:
+  - { id: revenue, current: "10000", prior: "8000" }
+  - { id: operating_cost, current: "6000", prior: "5000" }
+  - { id: net_profit, current: "1500", prior: "1000" }
+  - { id: net_profit_deducted, current: "900", prior: "950" }
+  - { id: operating_cash_flow, current: "400", prior: "1200" }
+  - { id: capex, current: "180", prior: "150" }
+  - { id: total_assets, current: "20000", prior: "18000" }
+  - { id: total_liabilities, current: "8000", prior: "7000" }
+  - { id: net_assets, current: "12000", prior: "11000" }
+  - { id: cash, current: "1000", prior: "900" }
+  - { id: accounts_receivable, current: "2200", prior: "1400" }
+  - { id: inventory, current: "1600", prior: "1100" }
+  - { id: goodwill, current: "800", prior: "800" }
+  - { id: current_assets, current: "6000", prior: "5000" }
+  - { id: current_liabilities, current: "3200", prior: "2800" }
+  - { id: short_term_debt, current: "500", prior: "400" }
+  - { id: long_term_debt, current: "2000", prior: "1800" }
+yoy:
+  revenue: "0.25"
+  net_profit: "0.5"
+ratios:
+  gross_margin: "0.4"
+  roe: "0.125"
+articulation: PASS
+anomalies:
+  - NON_RECURRING_ITEMS
+  - PROFIT_CASHFLOW_DIVERGENCE
+  - ACCOUNTING_POLICY_CHANGE
+valuation_range: present

@@ -13,4 +13,7 @@ public class StatementExtract {
     /** Every located candidate, including rejected rows and their reasons. */
     List<ExtractedLine> candidates;
     List<PolicyNote> policyNotes;
+    String sourcePath;
+    String sha256;
+    Integer pageCount;
 }
