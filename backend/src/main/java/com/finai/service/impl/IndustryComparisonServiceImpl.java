@@ -1,7 +1,6 @@
 package com.finai.service.impl;
 
 import com.finai.exception.ResourceNotFoundException;
-import com.finai.model.AnalysisTask;
 import com.finai.model.dto.ComparisonReportDTO;
 import com.finai.model.dto.IndustryRankingDTO;
 import com.finai.repository.AnalysisTaskRepository;
@@ -9,18 +8,15 @@ import com.finai.service.IndustryComparisonService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import java.util.List;
 
+import java.util.List;
 
 /**
  * 没有可比公司财报和市价，不输出对比数字。
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class IndustryComparisonServiceImpl implements IndustryComparisonService {
-
-    static final String NOT_COMPUTED = "未计算。没有可比公司的财报和市价，不输出行业排名、分位数或相对优劣。";
 
     private final AnalysisTaskRepository taskRepository;
 
@@ -49,10 +45,5 @@ public class IndustryComparisonServiceImpl implements IndustryComparisonService 
     @Override
     public ComparisonReportDTO compareWithIndustryAverage(String taskId, String industry) {
         throw unavailable(taskId);
-    }
-
-    private AnalysisTask require(String taskId) {
-        return taskRepository.findById(taskId)
-                .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskId));
     }
 }

@@ -77,6 +77,9 @@ class GoldSetTest {
                 && (valuation.getValuationRange() == null || valuation.getValuationRange().getMid() == null)) {
             mismatches.add("金标准要求有估值区间，实际没有");
         }
+        if ("absent".equals(gold.path("valuation_range").asText()) && valuation.getValuationRange() != null) {
+            mismatches.add("金标准要求无估值区间，实际有");
+        }
         assertThat(mismatches).as("金标准不一致").isEmpty();
     }
 
@@ -116,6 +119,7 @@ class GoldSetTest {
         return switch (id) {
             case "gross_margin" -> ratios.getGrossMargin();
             case "roe" -> ratios.getRoe();
+            case "average_equity_roe" -> ratios.getAverageEquityRoe();
             default -> null;
         };
     }

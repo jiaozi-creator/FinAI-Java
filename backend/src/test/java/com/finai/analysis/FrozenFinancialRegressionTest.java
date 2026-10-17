@@ -1,6 +1,8 @@
 package com.finai.analysis;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.math.BigDecimal;
 import java.util.Map;
@@ -11,7 +13,9 @@ import static org.assertj.core.api.Assertions.*;
 class FrozenFinancialRegressionTest {
     @Test void frozenReportsRetainGrowthAndCorrectColumns() {
         for (String code : new String[]{"000858", "600519"}) {
-            StatementExtract extract = new StatementExtractor().extract(Path.of("../data/raw/" + code + "_2023_annual.pdf").toString());
+            Path pdf = Path.of("../data/raw/" + code + "_2023_annual.pdf");
+            Assumptions.assumeTrue(Files.isRegularFile(pdf), "官方年报不在 data/raw，跳过冻结回归: " + pdf.toAbsolutePath().normalize());
+            StatementExtract extract = new StatementExtractor().extract(pdf.toString());
             var lines = extract.getLines().stream().collect(Collectors.toMap(ExtractedLine::getFieldId, Function.identity()));
             var metrics = new MetricCalculator().calculate(extract.getLines(), "2023A");
             for (String id : new String[]{"simple_free_cash_flow", "total_assets", "total_liabilities", "net_assets", "minority_interest", "shares_outstanding", "basic_eps"}) {

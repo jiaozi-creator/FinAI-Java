@@ -1108,6 +1108,59 @@ public class StatementExtractor {
         }
     }
 
+    /**
+     * 附注号和两列金额在抽出的文本里没有空格。按字形间距切开，避免本期数吞掉下一列的首位。
+     */
+    private static List<PageText.NumberCell> numberCells(String text, List<TextPosition> chars) {
+        List<PageText.NumberCell> cells = new ArrayList<>();
+        Matcher matcher = Pattern.compile("-?\\d[\\d,]*(?:\\.\\d+)?%?").matcher(text);
+        int cursor = 0;
+        while (cursor < text.length()) {
+            matcher.region(cursor, text.length());
+            if (!matcher.find()) {
+                break;
+            }
+            int start = matcher.start();
+            int end = matcher.end();
+            int split = columnGap(chars, start, end);
+            if (split >= 0) {
+                addNumberCell(cells, text, chars, start, split);
+                cursor = split;
+                continue;
+            }
+            addNumberCell(cells, text, chars, start, end);
+            cursor = end;
+        }
+        return cells;
+    }
+
+    private static int columnGap(List<TextPosition> chars, int start, int end) {
+        for (int i = start + 1; i < end && i < chars.size(); i++) {
+            TextPosition previous = chars.get(i - 1);
+            TextPosition current = chars.get(i);
+            float previousEnd = previous.getXDirAdj() + previous.getWidthDirAdj();
+            float gap = current.getXDirAdj() - previousEnd;
+            float width = Math.max(previous.getWidthDirAdj(), current.getWidthDirAdj());
+            if (gap > Math.max(6f, width * 1.5f)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static void addNumberCell(List<PageText.NumberCell> cells, String text, List<TextPosition> chars, int start, int end) {
+        if (end <= start || start >= chars.size()) {
+            return;
+        }
+        String token = text.substring(start, end);
+        if (!token.matches("-?\\d[\\d,]*(?:\\.\\d+)?%?")) {
+            return;
+        }
+        int last = Math.min(end, chars.size()) - 1;
+        TextPosition tail = chars.get(last);
+        cells.add(new PageText.NumberCell(token, chars.get(start).getXDirAdj(), tail.getXDirAdj() + tail.getWidthDirAdj()));
+    }
+
     private static class PositionedStripper extends PDFTextStripper {
         private final List<PageText.PositionedRow> positionedRows = new ArrayList<>();
         private final List<TextPosition> glyphs = new ArrayList<>();
@@ -1133,13 +1186,7 @@ public class StatementExtractor {
                     }
                     previous = glyph;
                 }
-                List<PageText.NumberCell> cells = new ArrayList<>();
-                Matcher matcher = Pattern.compile("-?\\d[\\d,]*(?:\\.\\d+)?%?").matcher(text);
-                while (matcher.find()) {
-                    var last = chars.get(matcher.end() - 1);
-                    cells.add(new PageText.NumberCell(matcher.group(), chars.get(matcher.start()).getXDirAdj(), last.getXDirAdj() + last.getWidthDirAdj()));
-                }
-                positionedRows.add(new PageText.PositionedRow(text.toString(), cells)); glyphs.clear();
+                positionedRows.add(new PageText.PositionedRow(text.toString(), numberCells(text.toString(), chars))); glyphs.clear();
             }
             super.writeLineSeparator();
         }

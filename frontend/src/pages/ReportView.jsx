@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Card, Spin, Tabs, Descriptions, Table, Tag, Button } from 'antd'
+import { Card, Spin, Tabs, Descriptions, Table, Tag, Button, message } from 'antd'
+import { DownloadOutlined } from '@ant-design/icons'
 import { taskAPI } from '../services/api'
 import FinancialMetricsTable, { formatMetric, sourceLabel } from '../components/FinancialMetricsTable'
 import { AcceptanceStatus, FinancialAnalysis, ValuationSummary } from '../components/AnalysisResults'
@@ -20,7 +21,30 @@ function ReportView() {
   const navigate = useNavigate()
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
   const [errorText, setErrorText] = useState('')
+
+  const downloadPdf = async () => {
+    setExporting(true)
+    try {
+      const blob = await taskAPI.exportReportPdf(taskId)
+      const file = blob instanceof Blob ? blob : new Blob([blob], { type: 'application/pdf' })
+      const url = URL.createObjectURL(file)
+      const link = document.createElement('a')
+      const company = report?.companyOverview?.companyName || taskId
+      const period = report?.companyOverview?.reportPeriod || ''
+      link.href = url
+      link.download = `${company}${period ? `_${period}` : ''}_分析报告.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      message.error(error.message || 'PDF 没有导出')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -64,8 +88,15 @@ function ReportView() {
   return (
     <div>
       <article className="report-sheet">
-        <div className="kicker">研究报告</div>
-        <h1>{report.title}</h1>
+        <div className="report-toolbar">
+          <div>
+            <div className="kicker">研究报告</div>
+            <h1>{report.title}</h1>
+          </div>
+          <Button icon={<DownloadOutlined />} loading={exporting} onClick={downloadPdf}>
+            导出 PDF
+          </Button>
+        </div>
         <div className="report-meta">
           <span>{report.companyOverview?.companyName}</span>
           <span>{report.companyOverview?.companyCode}</span>

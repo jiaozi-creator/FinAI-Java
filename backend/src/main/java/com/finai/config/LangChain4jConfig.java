@@ -19,6 +19,9 @@ public class LangChain4jConfig {
     @Value("${finai.llm.provider:aliyun}")
     private String llmProvider;
 
+    @Value("${finai.llm.temperature:0.0}")
+    private double temperature;
+
     @Value("${finai.llm.anthropic.api-key:}")
     private String anthropicApiKey;
 
@@ -34,9 +37,6 @@ public class LangChain4jConfig {
     @Value("${finai.llm.model:qwen3.7-flash}")
     private String model;
 
-    @Value("${finai.llm.temperature:0.0}")
-    private double temperature;
-
     @Value("${finai.llm.max-tokens:4096}")
     private int maxTokens;
 
@@ -48,6 +48,12 @@ public class LangChain4jConfig {
 
     @Value("${finai.competition-mode:true}")
     private boolean competitionMode;
+
+    @Bean
+    public LlmRuntime llmRuntime() {
+        boolean mock = "mock".equalsIgnoreCase(llmProvider);
+        return new LlmRuntime(llmProvider, model, temperature, mock);
+    }
 
     @Bean
     public ChatLanguageModel chatLanguageModel() {
@@ -110,14 +116,8 @@ public class LangChain4jConfig {
                     .maxTokens(maxTokens)
                     .timeout(Duration.ofMillis(timeoutMs))
                     .build();
-        } else {
-            throw new IllegalStateException("Unknown LLM provider: " + llmProvider);
         }
-    }
-
-    @Bean
-    public LlmRuntime llmRuntime() {
-        return new LlmRuntime(llmProvider, model, temperature, mockEnabled || "mock".equalsIgnoreCase(llmProvider));
+        throw new IllegalStateException("Unknown LLM provider: " + llmProvider);
     }
 
     private void requireKey(String key, String variable) {

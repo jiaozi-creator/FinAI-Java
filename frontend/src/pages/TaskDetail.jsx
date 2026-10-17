@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Descriptions, Tag, Progress, Button, Space, Spin, message, Table, Alert, Popover } from 'antd'
-import { ReloadOutlined, FileTextOutlined, StopOutlined, MessageOutlined } from '@ant-design/icons'
+import { ReloadOutlined, FileTextOutlined, StopOutlined, MessageOutlined, DownloadOutlined } from '@ant-design/icons'
 import { taskAPI, auditAPI } from '../services/api'
 import FinancialMetricsTable, { formatMetric, sourceLabel } from '../components/FinancialMetricsTable'
 import PageHeader from '../components/PageHeader'
@@ -198,6 +198,27 @@ function TaskDetail() {
               <>
                 <Button type="primary" icon={<FileTextOutlined />} onClick={() => navigate(`/tasks/${taskId}/report`)}>
                   查看报告
+                </Button>
+                <Button
+                  icon={<DownloadOutlined />}
+                  onClick={async () => {
+                    try {
+                      const blob = await taskAPI.exportReportPdf(taskId)
+                      const file = blob instanceof Blob ? blob : new Blob([blob], { type: 'application/pdf' })
+                      const url = URL.createObjectURL(file)
+                      const link = document.createElement('a')
+                      link.href = url
+                      link.download = `${task.companyName || taskId}${task.reportPeriod ? `_${task.reportPeriod}` : ''}_分析报告.pdf`
+                      document.body.appendChild(link)
+                      link.click()
+                      link.remove()
+                      URL.revokeObjectURL(url)
+                    } catch (error) {
+                      message.error(error.message || 'PDF 没有导出')
+                    }
+                  }}
+                >
+                  导出 PDF
                 </Button>
                 <Button icon={<MessageOutlined />} onClick={() => navigate(`/tasks/${taskId}/chat`)}>
                   对话追问

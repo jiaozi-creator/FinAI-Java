@@ -36,12 +36,12 @@ public interface ReportTemplateService {
     String exportToWord(String taskId, String templateId);
 
     /**
-     * 导出报告（PDF格式）
+     * 导出报告 PDF。内容来自已保存的分析快照。
      * @param taskId 任务ID
-     * @param templateId 模板ID
-     * @return PDF文件路径
+     * @param templateId 模板ID。TPL_SIMPLE 只含指标和异常，TPL_INVESTMENT 含估值和风险，其余为完整报告。
+     * @return PDF 字节
      */
-    String exportToPDF(String taskId, String templateId);
+    byte[] exportToPDF(String taskId, String templateId);
 
     /**
      * 创建自定义模板

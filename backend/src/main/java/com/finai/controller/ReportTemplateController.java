@@ -6,6 +6,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.finai.analysis.ReportPdfExporter;
+import com.finai.model.dto.AnalysisReportDTO;
+import com.finai.service.AnalysisService;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -27,6 +30,7 @@ import java.util.List;
 public class ReportTemplateController {
 
     private final ReportTemplateService reportTemplateService;
+    private final AnalysisService analysisService;
 
     @PostMapping("/{taskId}/generate")
     @Operation(summary = "生成报告", description = "根据模板生成报告")
@@ -67,21 +71,19 @@ public class ReportTemplateController {
                 .body(resource);
     }
 
-    @GetMapping("/{taskId}/export/pdf")
-    @Operation(summary = "导出PDF", description = "导出PDF格式报告")
-    public ResponseEntity<Resource> exportToPDF(
+    @GetMapping(value = "/{taskId}/export/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @Operation(summary = "导出PDF", description = "把已保存的分析快照导出为 PDF")
+    public ResponseEntity<byte[]> exportToPDF(
             @PathVariable String taskId,
             @RequestParam(defaultValue = "TPL_STANDARD") String templateId) {
         log.info("Exporting to PDF for task {}", taskId);
-        String filePath = reportTemplateService.exportToPDF(taskId, templateId);
-
-        File file = new File(filePath);
-        Resource resource = new FileSystemResource(file);
-
+        AnalysisReportDTO report = analysisService.getReport(taskId);
+        byte[] pdf = reportTemplateService.exportToPDF(taskId, templateId);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"report.pdf\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, ReportPdfExporter.attachmentHeader(report))
                 .contentType(MediaType.APPLICATION_PDF)
-                .body(resource);
+                .contentLength(pdf.length)
+                .body(pdf);
     }
 
     @GetMapping("/{taskId}/preview")

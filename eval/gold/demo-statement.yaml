@@ -27,10 +27,14 @@ yoy:
   net_profit: "0.5"
 ratios:
   gross_margin: "0.4"
-  roe: null
+  # 样本没有加权平均净资产收益率，ratios.roe 只取披露值，这里应为空。
+  roe: "null"
+  # 1500 / ((12000 + 11000) / 2)，平均归母权益，不是期末权益 1500/12000。
+  average_equity_roe: "0.13043478"
 articulation: PASS
 anomalies:
   - NON_RECURRING_ITEMS
   - PROFIT_CASHFLOW_DIVERGENCE
   - ACCOUNTING_POLICY_CHANGE
+# 未确认 WACC、增速和标准 FCFF 时不输出区间。
 valuation_range: absent

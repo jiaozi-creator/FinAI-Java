@@ -1,8 +1,10 @@
 package com.finai.service.impl;
 
+import com.finai.analysis.ReportPdfExporter;
 import com.finai.model.AnalysisTask;
 import com.finai.model.dto.ReportTemplateDTO;
 import com.finai.repository.AnalysisTaskRepository;
+import com.finai.service.AnalysisService;
 import com.finai.service.ReportTemplateService;
 import com.finai.exception.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -20,10 +22,15 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ReportTemplateServiceImpl implements ReportTemplateService {
 
     private final AnalysisTaskRepository taskRepository;
+    private final AnalysisService analysisService;
+    private final ReportPdfExporter reportPdfExporter;
     private final Map<String, ReportTemplateDTO> templates = new ConcurrentHashMap<>();
 
-    public ReportTemplateServiceImpl(AnalysisTaskRepository taskRepository) {
+    public ReportTemplateServiceImpl(AnalysisTaskRepository taskRepository, AnalysisService analysisService,
+                                     ReportPdfExporter reportPdfExporter) {
         this.taskRepository = taskRepository;
+        this.analysisService = analysisService;
+        this.reportPdfExporter = reportPdfExporter;
         initializeDefaultTemplates();
     }
 
@@ -74,20 +81,9 @@ public class ReportTemplateServiceImpl implements ReportTemplateService {
     }
 
     @Override
-    public String exportToPDF(String taskId, String templateId) {
-        log.info("Exporting to PDF for task {}", taskId);
-        String markdown = exportToMarkdown(taskId, templateId);
-        String outputDir = "./outputs/reports";
-        try {
-            Files.createDirectories(Paths.get(outputDir));
-            String filePath = outputDir + "/" + taskId + "_report.pdf";
-            log.warn("PDF export not fully implemented, saving as text file");
-            Files.writeString(Paths.get(filePath.replace(".pdf", ".txt")), markdown);
-            return filePath;
-        } catch (IOException e) {
-            log.error("Failed to export to PDF", e);
-            throw new RuntimeException("Export failed: " + e.getMessage());
-        }
+    public byte[] exportToPDF(String taskId, String templateId) {
+        log.info("Exporting snapshot PDF for task {}", taskId);
+        return reportPdfExporter.write(analysisService.getReport(taskId), templateId);
     }
 
     @Override

@@ -231,6 +231,17 @@
   padding: 28px 28px 12px;
 }
 
+.report-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.report-toolbar h1 {
+  margin-bottom: 0;
+}
+
 .report-meta {
   display: flex;
   flex-wrap: wrap;

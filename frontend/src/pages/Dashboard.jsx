@@ -48,7 +48,9 @@ function Dashboard() {
       const task = await taskAPI.openDemo()
       navigate(`/tasks/${task.taskId}`)
     } catch (error) {
-      message.error('演示样例没有打开，先确认后端已重启')
+      const detail = error.response?.data
+      const text = typeof detail === 'string' ? detail : detail?.message
+      message.error(text || '演示样例没有打开')
     } finally {
       setOpeningDemo(false)
     }

@@ -1,5 +1,6 @@
 package com.finai.controller;
 
+import com.finai.analysis.ReportPdfExporter;
 import com.finai.model.AnalysisTask;
 import com.finai.model.dto.*;
 import com.finai.service.AnalysisService;
@@ -12,6 +13,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +38,7 @@ public class AnalysisTaskController {
     private final DemoTaskService demoTaskService;
     private final TaskOrchestrator orchestrator;
     private final com.finai.service.ValuationInputService valuationInputs;
+    private final ReportPdfExporter reportPdfExporter;
 
     @GetMapping("/{taskId}/valuation-inputs")
     public ResponseEntity<com.finai.model.ValuationConfirmation> valuationInputs(@PathVariable String taskId) {
@@ -134,6 +137,20 @@ public class AnalysisTaskController {
         log.info("Getting report for task: {}", taskId);
         AnalysisReportDTO report = analysisService.getReport(taskId);
         return ResponseEntity.ok(report);
+    }
+
+    @GetMapping(value = {"/{taskId}/report/pdf", "/{taskId}/report.pdf"}, produces = MediaType.APPLICATION_PDF_VALUE)
+    @Operation(summary = "导出任务报告 PDF", description = "把已保存的分析快照导出为 PDF，不重新计算")
+    public ResponseEntity<byte[]> exportReportPdf(
+            @Parameter(description = "任务ID") @PathVariable String taskId) {
+        log.info("Exporting PDF report for task: {}", taskId);
+        AnalysisReportDTO report = analysisService.getReport(taskId);
+        byte[] pdf = reportPdfExporter.write(report);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ReportPdfExporter.attachmentHeader(report))
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdf.length)
+                .body(pdf);
     }
 
     /**

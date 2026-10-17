@@ -37,6 +37,7 @@ class FilingProbeTest {
         Map<String, ExtractedLine> byId = extract.getLines().stream()
                 .collect(Collectors.toMap(ExtractedLine::getFieldId, Function.identity(), (a, b) -> a));
         assertAmount(byId, "net_profit", "-9822497.95", "-151420324.40", "consolidated");
+        // 扣非金额来自主要会计数据，范围按合并口径保存，和同比规则一致。
         assertAmount(byId, "net_profit_deducted", "-39312271.78", "-279702121.97", "consolidated");
         assertAmount(byId, "cash", "1088855303.96", "1006282974.26", "consolidated");
         assertAmount(byId, "inventory", "1781225167.08", "1643949298.23", "consolidated");

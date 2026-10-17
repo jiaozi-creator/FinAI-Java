@@ -66,6 +66,28 @@ export const taskAPI = {
     return api.get(`/tasks/${taskId}/report`)
   },
 
+  exportReportPdf: async (taskId) => {
+    try {
+      return await api.get(`/tasks/${taskId}/report/pdf`, {
+        responseType: 'blob',
+        headers: { Accept: 'application/pdf' },
+      })
+    } catch (error) {
+      const data = error?.response?.data
+      if (data instanceof Blob) {
+        try {
+          const parsed = JSON.parse(await data.text())
+          if (parsed.message) {
+            error.message = parsed.message
+          }
+        } catch {
+          /* 错误体不是 JSON 时保留原消息 */
+        }
+      }
+      throw error
+    }
+  },
+
   // 获取财务指标
   getMetrics: (taskId) => {
     return api.get(`/tasks/${taskId}/metrics`)

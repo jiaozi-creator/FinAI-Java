@@ -98,6 +98,7 @@ public class DemoTaskService {
         }
     }
 
+    @Slf4j
     @Component
     @Order(20)
     @RequiredArgsConstructor

@@ -21,6 +21,19 @@ class LangChain4jConfigTest {
     }
 
     @Test
+    void exposesRuntimeMatchingProvider() {
+        LlmRuntime runtime = config("aliyun").llmRuntime();
+        assertThat(runtime.isMock()).isFalse();
+        assertThat(runtime.leavesMachine()).isTrue();
+        assertThat(runtime.getModel()).isEqualTo("qwen3.7-flash");
+
+        LangChain4jConfig mock = config("mock");
+        ReflectionTestUtils.setField(mock, "mockEnabled", true);
+        assertThat(mock.llmRuntime().isMock()).isTrue();
+        assertThat(mock.llmRuntime().leavesMachine()).isFalse();
+    }
+
+    @Test
     void requiresKeyInsteadOfFallingBackToMock() {
         LangChain4jConfig config = config("aliyun");
         ReflectionTestUtils.setField(config, "aliyunApiKey", "");

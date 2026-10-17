@@ -33,7 +33,9 @@ function CreateTask() {
       message.success('任务创建成功')
       navigate(`/tasks/${response.taskId}`)
     } catch (error) {
-      message.error('任务创建失败')
+      const detail = error.response?.data
+      const text = typeof detail === 'string' ? detail : detail?.message
+      message.error(text || '任务创建失败')
       console.error(error)
     } finally {
       setLoading(false)

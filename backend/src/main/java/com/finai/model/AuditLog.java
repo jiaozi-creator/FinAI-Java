@@ -77,7 +77,7 @@ public class AuditLog {
     private String status;
 
     /**
-     * 错误信息
+     * 错误信息。类型交给方言，避免 H2 把 MySQL 的 TEXT 定义原样写进建表语句后整张表建不出来。
      */
     @Lob
     @Column(name = "error_message")

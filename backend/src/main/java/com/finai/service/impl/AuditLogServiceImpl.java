@@ -8,7 +8,9 @@ import com.finai.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -25,9 +27,9 @@ public class AuditLogServiceImpl implements AuditLogService {
 
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
+    private final PlatformTransactionManager transactionManager;
 
     @Override
-    @Transactional
     public void logTaskCreation(String taskId, TaskRequestDTO request) {
         try {
             String inputParams = objectMapper.writeValueAsString(request);
@@ -40,14 +42,13 @@ public class AuditLogServiceImpl implements AuditLogService {
                     .status("SUCCESS")
                     .createdAt(LocalDateTime.now())
                     .build();
-            auditLogRepository.save(auditLog);
+            saveIsolated(auditLog);
         } catch (Exception e) {
             log.error("Failed to log task creation", e);
         }
     }
 
     @Override
-    @Transactional
     public void logTaskCompletion(String taskId) {
         try {
             AuditLog auditLog = AuditLog.builder()
@@ -58,14 +59,13 @@ public class AuditLogServiceImpl implements AuditLogService {
                     .status("SUCCESS")
                     .createdAt(LocalDateTime.now())
                     .build();
-            auditLogRepository.save(auditLog);
+            saveIsolated(auditLog);
         } catch (Exception e) {
             log.error("Failed to log task completion", e);
         }
     }
 
     @Override
-    @Transactional
     public void logTaskFailure(String taskId, Exception exception) {
         try {
             AuditLog auditLog = AuditLog.builder()
@@ -77,14 +77,13 @@ public class AuditLogServiceImpl implements AuditLogService {
                     .errorMessage(exception.getClass().getSimpleName())
                     .createdAt(LocalDateTime.now())
                     .build();
-            auditLogRepository.save(auditLog);
+            saveIsolated(auditLog);
         } catch (Exception e) {
             log.error("Failed to log task failure", e);
         }
     }
 
     @Override
-    @Transactional
     public void logTaskCancellation(String taskId) {
         try {
             AuditLog auditLog = AuditLog.builder()
@@ -95,14 +94,13 @@ public class AuditLogServiceImpl implements AuditLogService {
                     .status("SUCCESS")
                     .createdAt(LocalDateTime.now())
                     .build();
-            auditLogRepository.save(auditLog);
+            saveIsolated(auditLog);
         } catch (Exception e) {
             log.error("Failed to log task cancellation", e);
         }
     }
 
     @Override
-    @Transactional
     public void logTaskDeletion(String taskId) {
         try {
             AuditLog auditLog = AuditLog.builder()
@@ -113,14 +111,13 @@ public class AuditLogServiceImpl implements AuditLogService {
                     .status("SUCCESS")
                     .createdAt(LocalDateTime.now())
                     .build();
-            auditLogRepository.save(auditLog);
+            saveIsolated(auditLog);
         } catch (Exception e) {
             log.error("Failed to log task deletion", e);
         }
     }
 
     @Override
-    @Transactional
     public void logToolInvocation(String taskId, String toolName, String input, String output, Long executionTime) {
         try {
             AuditLog auditLog = AuditLog.builder()
@@ -134,14 +131,13 @@ public class AuditLogServiceImpl implements AuditLogService {
                     .executionTimeMs(executionTime)
                     .createdAt(LocalDateTime.now())
                     .build();
-            auditLogRepository.save(auditLog);
+            saveIsolated(auditLog);
         } catch (Exception e) {
             log.error("Failed to log tool invocation", e);
         }
     }
 
     @Override
-    @Transactional
     public void logFileAccess(String taskId, String path, String sha256, long bytes, int pages) {
         try {
             AuditLog auditLog = AuditLog.builder()
@@ -154,14 +150,13 @@ public class AuditLogServiceImpl implements AuditLogService {
                     .status("SUCCESS")
                     .createdAt(LocalDateTime.now())
                     .build();
-            auditLogRepository.save(auditLog);
+            saveIsolated(auditLog);
         } catch (Exception e) {
             log.error("Failed to log file access", e);
         }
     }
 
     @Override
-    @Transactional
     public void logLLMRequest(String taskId, String details, String model, String prompt, String response, Long executionTime) {
         try {
             AuditLog auditLog = AuditLog.builder()
@@ -176,14 +171,13 @@ public class AuditLogServiceImpl implements AuditLogService {
                     .version(model)
                     .createdAt(LocalDateTime.now())
                     .build();
-            auditLogRepository.save(auditLog);
+            saveIsolated(auditLog);
         } catch (Exception e) {
             log.error("Failed to log LLM request", e);
         }
     }
 
     @Override
-    @Transactional
     public void logError(String taskId, String operation, String errorMessage) {
         try {
             AuditLog auditLog = AuditLog.builder()
@@ -195,7 +189,7 @@ public class AuditLogServiceImpl implements AuditLogService {
                     .errorMessage("Details withheld; inspect sanitized application diagnostics")
                     .createdAt(LocalDateTime.now())
                     .build();
-            auditLogRepository.save(auditLog);
+            saveIsolated(auditLog);
         } catch (Exception e) {
             log.error("Failed to log error", e);
         }
@@ -238,8 +232,14 @@ public class AuditLogServiceImpl implements AuditLogService {
     }
 
     /**
-     * 截断长文本
+     * 审计写入用独立事务。失败只回滚这一笔，不能把调用方已经标成 rollback-only。
      */
+    private void saveIsolated(AuditLog auditLog) {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        template.executeWithoutResult(status -> auditLogRepository.save(auditLog));
+    }
+
     private String fingerprint(String text) {
         if (text == null) {
             return null;

@@ -1,5 +1,6 @@
 package com.finai;
 
+import com.finai.config.DotenvLoader;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
@@ -24,6 +25,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 public class FinAIApplication {
 
     public static void main(String[] args) {
+        DotenvLoader.load();
         SpringApplication.run(FinAIApplication.class, args);
         System.out.println("""
 
