@@ -37,6 +37,15 @@ public class ValuationInputService {
         if (task.getStatus() == com.finai.model.AnalysisTask.TaskStatus.RUNNING || task.getStatus() == com.finai.model.AnalysisTask.TaskStatus.QUEUED)
             throw new IllegalArgumentException("运行中不能修改估值确认，请等待本次运行结束");
         ValuationParameters p = request.parameters();
+        if (p != null && (p.getInputMode() != null || p.getForecast() != null)) {
+            var errors = com.finai.analysis.AnnualDcfModel.inputErrors(p);
+            if (p.isBridgePolicyConfirmed()) errors.addAll(com.finai.analysis.AnnualDcfModel.bridgeErrors(p));
+            if (blank(request.confirmedBy()) || blank(request.rationale())) errors.add("确认人及依据不能为空");
+            if (!errors.isEmpty()) throw new IllegalArgumentException(String.join("；", errors));
+            return save(taskId, request, p);
+        }
+        if (p != null && (blank(p.getValuationScope()) || blank(p.getForecastSource()) || blank(p.getFinancialCompanyTreatment())))
+            throw new IllegalArgumentException("新确认必须说明估值范围、财务公司处理及预测来源；旧基期模式继续可读");
         if (p == null || !p.isAssumptionsConfirmed() || !p.isBridgePolicyConfirmed() || blank(p.getBridgePolicy())
                 || blank(request.confirmedBy()) || blank(request.rationale())) throw new IllegalArgumentException("须明确确认全部参数、桥接政策、确认人及依据");
         if (p.getConfirmedFcff() == null || p.getConfirmedFcff().signum() <= 0 || p.getConfirmedGrowth() == null
@@ -59,6 +68,15 @@ public class ValuationInputService {
             return confirmations.save(ValuationConfirmation.builder().id(id).taskId(taskId).confirmedBy(request.confirmedBy())
                     .confirmedAt(LocalDateTime.now()).source("user_confirmed").rationale(request.rationale())
                     .parametersJson(mapper.writeValueAsString(versioned)).build());
+        } catch (java.io.IOException e) { throw new IllegalStateException("Could not persist valuation inputs", e); }
+    }
+
+    private ValuationConfirmation save(String taskId, ConfirmationRequest request, ValuationParameters parameters) {
+        String id = UUID.randomUUID().toString();
+        try {
+            return confirmations.save(ValuationConfirmation.builder().id(id).taskId(taskId).confirmedBy(request.confirmedBy())
+                    .confirmedAt(LocalDateTime.now()).source("user_confirmed").rationale(request.rationale())
+                    .parametersJson(mapper.writeValueAsString(parameters.toBuilder().version(id).build())).build());
         } catch (java.io.IOException e) { throw new IllegalStateException("Could not persist valuation inputs", e); }
     }
 

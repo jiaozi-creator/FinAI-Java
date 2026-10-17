@@ -18,6 +18,7 @@ public interface ChatAnalysisService {
      * @return 智能回答
      */
     ChatResponseDTO askQuestion(String taskId, String question);
+    ChatResponseDTO askQuestion(String taskId, String question, String requestId);
 
     /**
      * 获取对话历史

@@ -24,6 +24,10 @@ public class AnalysisReportDTO {
     private String taskId;
     private com.finai.agent.AgentResult reviewResult;
     private String businessStatus;
+    private String financialAutoCheckStatus;
+    private String valuationInputStatus;
+    private String valuationCalculationStatus;
+    private String manualFinancialReviewStatus;
 
     /**
      * 报告标题
@@ -174,5 +178,8 @@ public class AnalysisReportDTO {
         private Boolean leavesMachine;
         private List<String> toolsUsed;
         private String generatedAt;
+        private String runId;
+        private String codeVersion;
+        private String parameterVersion;
     }
 }

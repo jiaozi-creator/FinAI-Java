@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Spin, Tabs, Descriptions, Table, Tag, Button } from 'antd'
 import { taskAPI } from '../services/api'
 import FinancialMetricsTable, { formatMetric, sourceLabel } from '../components/FinancialMetricsTable'
+import { AcceptanceStatus, FinancialAnalysis, ValuationSummary } from '../components/AnalysisResults'
 
 const { TabPane } = Tabs
 
@@ -71,6 +72,7 @@ function ReportView() {
           <span>{report.companyOverview?.reportPeriod}</span>
           <span>{report.companyOverview?.reportType}</span>
         </div>
+        <AcceptanceStatus report={report} />
         <Tabs defaultActiveKey="1">
           <TabPane tab="公司概况" key="1">
             <Descriptions bordered>
@@ -99,6 +101,7 @@ function ReportView() {
             {report.metrics ? (
               <Card>
                 <FinancialMetricsTable metrics={report.metrics} />
+                <FinancialAnalysis metrics={report.metrics} />
               </Card>
             ) : (
               <p>暂无数据</p>
@@ -185,6 +188,7 @@ function ReportView() {
             <TabPane tab="估值结果" key="5">
               <Card>
                 <h3>估值区间</h3>
+                <ValuationSummary valuation={report.valuation} />
                 {report.valuation.valuationRange ? (
                   <>
                     <Descriptions bordered>

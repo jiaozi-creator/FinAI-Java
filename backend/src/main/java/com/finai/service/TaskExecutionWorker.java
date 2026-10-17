@@ -135,6 +135,13 @@ public class TaskExecutionWorker {
             update(taskId, 96, "复核报告");
             var review = orchestrator.stage(executionId, "REVIEW", () -> reviewAgent.review(report));
             report.setReviewResult(review);
+            report.setFinancialAutoCheckStatus("ok".equals(review.getStatus()) ? "PASSED" : "NEEDS_REVIEW");
+            report.setManualFinancialReviewStatus("PENDING");
+            report.setValuationInputStatus(valuation == null ? "NOT_EXECUTED" : valuation.getInputStatus() == null ? valuation.getValuationRange() == null ? "INPUT_INCOMPLETE" : "COMPLETE" : valuation.getInputStatus());
+            report.setValuationCalculationStatus(valuation == null ? "NOT_EXECUTED" : valuation.getCalculationStatus() == null ? valuation.getValuationRange() == null ? "NOT_EXECUTED" : "COMPUTED" : valuation.getCalculationStatus());
+            report.getExecutionSummary().setRunId(runId);
+            report.getExecutionSummary().setCodeVersion("financial-workbench-2026.10.17-uncommitted");
+            report.getExecutionSummary().setParameterVersion(parameters.getVersion());
             report.setBusinessStatus("ok".equals(review.getStatus()) ? "PASSED" : "NEEDS_REVIEW");
             if (!"ok".equals(review.getStatus())) {
                 report.setConclusion("报告复核发现问题，正式结论被阻断：" + String.join("；", review.getWarnings()));

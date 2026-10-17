@@ -29,6 +29,8 @@ import java.util.regex.Pattern;
 @Component
 public class StatementExtractor {
 
+    private record Spec(String fieldId, String name, List<String> aliases) {}
+
     private static final Pattern UNIT = Pattern.compile("单位[：:]\\s*(?:人民币)?(亿元|百万元|万元|千元|元)");
     private static final Pattern NUMBER = Pattern.compile("[(（]\\s*\\d[\\d,，]*\\.?\\d*\\s*[)）]|-?\\d[\\d,，]*(?:\\.\\d+)?");
     private static final Pattern NO_MATERIAL = Pattern.compile("无重大|未发生|本期无|不存在|不适用|无变更|没有发生|无需变更");
@@ -55,9 +57,28 @@ public class StatementExtractor {
             new Spec("total_assets", "资产总计", List.of("资产总计", "资产合计", "总资产")),
             new Spec("total_liabilities", "负债合计", List.of("负债合计", "负债总计")),
             new Spec("net_assets", "归母权益", List.of("归属于上市公司股东的净资产", "归属于母公司所有者权益合计", "归属于母公司所有者权益（或股东权益）合计", "归属于母公司股东权益合计")),
-            new Spec("total_equity", "合并权益", List.of("所有者权益合计", "股东权益合计")),
+            new Spec("total_equity", "合并权益", List.of("所有者权益合计", "股东权益合计", "所有者权益（或股东权益）合计")),
             new Spec("cash", "货币资金", List.of("货币资金")),
             new Spec("restricted_cash", "受限资金", List.of("受限制的货币资金", "受限货币资金", "受限资金")),
+            new Spec("cash_equivalents", "现金及现金等价物", List.of("期末现金及现金等价物余额")),
+            new Spec("accrued_deposit_interest", "应计定期存款利息", List.of("计提的定期存款利息")),
+            new Spec("restricted_interbank", "受限同业存款", List.of("不能随时支取的同业存款")),
+            new Spec("reconciliation_impairment", "资产减值准备", List.of("资产减值准备")),
+            new Spec("reconciliation_credit_impairment", "信用减值损失", List.of("信用减值损失")),
+            new Spec("reconciliation_depreciation", "固定资产折旧", List.of("固定资产折旧、油气资产折耗、生产性生物资产折旧", "固定资产折旧")),
+            new Spec("reconciliation_rou_amortization", "使用权资产摊销", List.of("使用权资产摊销", "使用权资产折旧")),
+            new Spec("reconciliation_amortization", "无形资产摊销", List.of("无形资产摊销")),
+            new Spec("reconciliation_long_term_amortization", "长期待摊费用摊销", List.of("长期待摊费用摊销")),
+            new Spec("reconciliation_disposal_loss", "处置长期资产损失", List.of("处置固定资产、无形资产和其他长期资产的损失")),
+            new Spec("reconciliation_retirement_loss", "固定资产报废损失", List.of("固定资产报废损失")),
+            new Spec("reconciliation_fair_value_loss", "公允价值变动损失", List.of("公允价值变动损失")),
+            new Spec("reconciliation_finance_cost", "财务费用", List.of("财务费用")),
+            new Spec("reconciliation_investment_loss", "投资损失", List.of("投资损失")),
+            new Spec("reconciliation_deferred_tax_assets", "递延所得税资产减少", List.of("递延所得税资产减少")),
+            new Spec("reconciliation_deferred_tax_liabilities", "递延所得税负债增加", List.of("递延所得税负债增加")),
+            new Spec("reconciliation_inventory_change", "存货减少", List.of("存货的减少")),
+            new Spec("reconciliation_operating_receivables_change", "经营性应收项目减少", List.of("经营性应收项目的减少")),
+            new Spec("reconciliation_operating_payables_change", "经营性应付项目增加", List.of("经营性应付项目的增加")),
             new Spec("notes_receivable", "应收票据", List.of("应收票据")),
             new Spec("accounts_receivable", "应收账款", List.of("应收账款")),
             new Spec("inventory", "存货", List.of("存货")),
@@ -120,7 +141,13 @@ public class StatementExtractor {
         for (PageText page : pages) {
             int firstCandidate = found.size();
             String text = page.getText() == null ? "" : page.getText();
-            if (text.contains("二、财务报表") && text.contains("合并资产负债表")) {
+            if (text.contains("现金流量表补充资料") && text.contains("将净利润调节为经营活动现金流量")) {
+                context.section = "cash_flow_reconciliation";
+                context.statementType = "cash_flow_reconciliation";
+                context.periodType = "annual";
+                context.scope = "consolidated";
+            }
+            if (text.contains("合并资产负债表") && (text.contains("二、财务报表") || text.contains("编制单位"))) {
                 context.inNotes = false;
                 positionedContext.inNotes = false;
             }
@@ -132,6 +159,13 @@ public class StatementExtractor {
             String[] rows = text.split("\\R");
             for (int i = 0; i < rows.length; i++) {
                 updateContext(rows[i], context);
+                ExtractedLine reconciliation = matchReconciliationLine(rows[i], page.getPageNumber(), unit, context.scope, sourceFile, context);
+                if ("cash_flow_reconciliation".equals(context.statementType)
+                        && (reconciliation == null || isDeferredTaxReconciliation(reconciliation.getFieldId()))) {
+                    ExtractedLine wrapped = matchWrappedReconciliationLine(rows, i, page.getPageNumber(), unit, sourceFile, context);
+                    if (wrapped != null) reconciliation = wrapped;
+                }
+                if (reconciliation != null) found.add(reconciliation);
                 ExtractedLine line = matchLine(rows[i], page.getPageNumber(), unit, context.scope, sourceFile);
                 if (line == null) {
                     line = matchWrapped(rows, i, page.getPageNumber(), unit, context.scope, sourceFile);
@@ -140,10 +174,13 @@ public class StatementExtractor {
                     line = matchVerifiedBlank(rows[i], page.getPageNumber(), unit, context, sourceFile);
                 }
                 if (line == null) {
-                    line = matchDeductedFragment(rows[i], page.getPageNumber(), unit, scope, sourceFile);
+                    line = matchDeductedFragment(rows[i], page.getPageNumber(), unit, context.scope, sourceFile);
                 }
                 if (line != null) {
-                    if (!("net_profit_consolidated".equals(line.getFieldId())
+                    boolean reconciliationField = line.getFieldId() != null && line.getFieldId().startsWith("reconciliation_");
+                    boolean reconciliationScope = "cash_flow_reconciliation".equals(context.statementType);
+                    if ((!reconciliationField || reconciliationScope)
+                            && !("net_profit_consolidated".equals(line.getFieldId())
                             && !("income_statement".equals(context.statementType) && "consolidated".equals(context.scope)))
                             && !("cash_flow_reconciliation".equals(context.statementType)
                             && ("net_profit_consolidated".equals(line.getFieldId()) || "operating_cash_flow".equals(line.getFieldId())))) {
@@ -154,6 +191,7 @@ public class StatementExtractor {
             parseAnnualSummary(text, page.getPageNumber(), unit, sourceFile, found);
             parseNonRecurring(text, page.getPageNumber(), unit, context.scope, sourceFile, found, nonRecurringOpen);
             parsePositionedTables(page, unit, sourceFile, found, positionedContext);
+            parseCashNotes(pages, page, sourceFile, found, context);
             // 保存整页表格上下文，行标题、列标题和折行均可展开复核。
             for (int n = firstCandidate; n < found.size(); n++) found.set(n, found.get(n).toBuilder().snippet(text).build());
             PolicyNote note = matchPolicy(text, page.getPageNumber());
@@ -169,9 +207,9 @@ public class StatementExtractor {
         if (line.isEmpty()) {
             return null;
         }
-        FieldSpec best = null;
+        Spec best = null;
         String bestAlias = null;
-        for (FieldSpec spec : specs) {
+        for (Spec spec : SPECS) {
             for (String alias : spec.aliases()) {
                 if (!line.startsWith(alias)) {
                     continue;
@@ -205,9 +243,10 @@ public class StatementExtractor {
         if (line.length() < 4 || index + 1 >= rows.length) {
             return null;
         }
-        FieldSpec best = null;
+        Spec best = null;
         int bestLen = -1;
-        for (FieldSpec spec : specs) {
+        for (Spec spec : SPECS) {
+            if (spec.fieldId().startsWith("reconciliation_")) continue;
             for (String alias : spec.aliases()) {
                 boolean broken = alias.startsWith(line) && alias.length() > line.length() && line.length() >= 8;
                 boolean labelOnly = lineStartsAlias(line, alias) && readNumbers(tailAfter(line, alias)).isEmpty();
@@ -223,6 +262,9 @@ public class StatementExtractor {
         if (best == null) {
             return null;
         }
+        // 主表空白债务行不得跨到应付票据、附注或其他未知科目借数。
+        if (List.of("short_term_debt", "long_term_debt", "bonds_payable", "notes_receivable").contains(best.fieldId())
+                && line.equals(best.aliases().get(0))) return null;
         StringBuilder continuation = new StringBuilder();
         List<BigDecimal> numbers = List.of();
         for (int offset = 1; offset <= 8 && index + offset < rows.length; offset++) {
@@ -244,7 +286,11 @@ public class StatementExtractor {
         if ("shares_outstanding".equals(best.fieldId()) || "share_capital".equals(best.fieldId())) {
             normalizedUnit = "share_capital".equals(best.fieldId()) ? "元" : "股";
         }
-        return toLine(best, numbers, page, unit, scope, sourceFile, line + " " + numberLine);
+        return ExtractedLine.builder()
+                .fieldId(best.fieldId()).fieldName(best.name())
+                .current(numbers.get(0)).prior(numbers.size() > 1 ? numbers.get(1) : null)
+                .unit(normalizedUnit).scope(scope).page(page).snippet(snippet)
+                .confidence(numbers.size() > 1 ? 0.8 : 0.55).sourceFile(sourceFile).build();
     }
 
     /**
@@ -260,7 +306,7 @@ public class StatementExtractor {
         if (numbers.size() < 2) {
             return null;
         }
-        return toLine(new FieldSpec("net_profit_deducted", "扣非净利润", List.of("扣除非经常性损益的净利润")),
+        return toLine(new Spec("net_profit_deducted", "扣非净利润", List.of("扣除非经常性损益的净利润")),
                 numbers, page, unit, scope, sourceFile, line);
     }
 
@@ -322,21 +368,6 @@ public class StatementExtractor {
         return "unknown";
     }
 
-    private ExtractedLine toLine(FieldSpec best, List<BigDecimal> numbers, int page, String unit, String scope, String sourceFile, String snippet) {
-        return ExtractedLine.builder()
-                .fieldId(best.fieldId())
-                .fieldName(best.name())
-                .current(numbers.get(0))
-                .prior(numbers.size() > 1 ? numbers.get(1) : null)
-                .unit(normalizedUnit)
-                .scope(scope)
-                .page(page)
-                .snippet(snippet)
-                .confidence(numbers.size() > 1 ? 0.8 : 0.55)
-                .sourceFile(sourceFile)
-                .build();
-    }
-
     private void parseAnnualSummary(String text, int page, String unit, String sourceFile, List<ExtractedLine> found) {
         if (!text.contains("主要会计数据")) return;
         String monetaryUnit = unit;
@@ -375,7 +406,7 @@ public class StatementExtractor {
         List<BigDecimal> amounts = new ArrayList<>();
         while (amountMatcher.find()) amounts.add(parseNumber(amountMatcher.group()));
         boolean adjusted = normalize(text).contains("调整前") && normalize(text).contains("调整后") && amounts.size() >= 3;
-        List<BigDecimal> values = List.of(parseNumber(matcher.group(1)), adjusted ? amounts.get(2) : parseNumber(matcher.group(2)));
+        List<BigDecimal> values = List.of(parseNumber(matcher.group(1)), adjusted ? amounts.get(adjustedPriorIndex(text)) : parseNumber(matcher.group(2)));
         String snippet = text.substring(matcher.start(), rowEnd);
         Matcher percentage = Pattern.compile("(-?\\d+(?:\\.\\d+)?)%").matcher(row);
         ExtractedLine candidate = enrich(toLine(spec, values, page, unit, "consolidated", sourceFile, snippet), context);
@@ -402,6 +433,13 @@ public class StatementExtractor {
 
     private static BigDecimal parseNumber(String value) {
         return new BigDecimal(value.replace(",", "").replace("，", ""));
+    }
+
+    private static BigDecimal parsePositionedNumber(String value) {
+        String cleaned = value == null ? "" : value.trim();
+        cleaned = cleaned.replaceFirst("^\\d{1,2}\\s+(?=\\d[\\d,]*\\.\\d+)", "");
+        cleaned = cleaned.replaceFirst("^1\\s+1(?=,)", "1");
+        return parseNumber(cleaned);
     }
 
     private ExtractedLine matchVerifiedBlank(String raw, int page, String unit, ParseContext context, String sourceFile) {
@@ -432,13 +470,112 @@ public class StatementExtractor {
                 .unit(resolvedUnit)
                 .statementType(context.statementType)
                 .sourceSection(context.section)
-                .periodType(context.periodType)
+                .periodType(isBalanceField(line.getFieldId()) && ("annual_summary".equals(context.section) || "balance_sheet".equals(context.statementType)) ? "point_in_time" : context.periodType)
                 .periodStart(context.periodStart)
                 .periodEnd(context.periodEnd)
                 .asOfDate(context.asOfDate)
                 .currentColumn(context.currentColumn)
                 .priorColumn(context.priorColumn)
                 .build();
+    }
+
+    /** 修复调整列错接：根据表头顺序选择调整后的比较列。 */
+    private static int adjustedPriorIndex(String text) {
+        String t = normalize(text);
+        return t.indexOf("调整后") < t.indexOf("调整前") ? 1 : 2;
+    }
+
+    private ExtractedLine matchReconciliationLine(String raw, int page, String unit, String scope, String file, ParseContext context) {
+        if (!"cash_flow_reconciliation".equals(context.statementType)) return null;
+        String line = normalize(raw);
+        String id = null, name = null;
+        if (line.startsWith("净利润")) { id = "reconciliation_net_profit"; name = "现金流调节表净利润"; }
+        else if (line.startsWith("经营活动产生的现金流量净额")) { id = "reconciliation_operating_cash_flow"; name = "调节后经营现金流"; }
+        else for (Spec spec : SPECS) if (spec.fieldId().startsWith("reconciliation_") && spec.aliases().stream().anyMatch(alias -> lineStartsAlias(line, alias))) { id = spec.fieldId(); name = spec.name(); break; }
+        if (id == null) return null;
+        List<BigDecimal> numbers = readNumbers(line);
+        if (numbers.isEmpty()) return null;
+        ExtractedLine extracted = enrich(toLine(new Spec(id, name, List.of(name)), numbers, page, unit, "consolidated", file, line), context)
+                .toBuilder().sourceSection("cash_flow_reconciliation").statementType("cash_flow_reconciliation").periodType("annual").build();
+        if ("reconciliation_operating_cash_flow".equals(id)) context.statementType = "cash_flow_reconciliation_done";
+        return extracted;
+    }
+
+    private ExtractedLine matchWrappedReconciliationLine(String[] rows, int index, int page, String unit, String file, ParseContext context) {
+        String first = normalize(rows[index]);
+        Spec match = null;
+        for (Spec spec : SPECS) {
+            if (!spec.fieldId().startsWith("reconciliation_")) continue;
+            if (spec.aliases().stream().anyMatch(alias ->
+                    (alias.startsWith(first) || first.startsWith(alias)) && first.length() >= 8)) {
+                match = spec;
+                break;
+            }
+        }
+        if (match == null) return null;
+        StringBuilder joined = new StringBuilder(first);
+        List<BigDecimal> numbers = readNumbers(joined.toString());
+        boolean wrappedTaxLine = "reconciliation_deferred_tax_assets".equals(match.fieldId())
+                || "reconciliation_deferred_tax_liabilities".equals(match.fieldId());
+        boolean wrappedToNextRow = false;
+        for (int offset = 1; (numbers.isEmpty() || (wrappedTaxLine && numbers.size() == 1))
+                && offset <= 3 && index + offset < rows.length; offset++) {
+            String next = normalize(rows[index + offset]);
+            if (next.isBlank() || next.matches(".*(?:现金流量净额|补充资料|本期金额|上期金额|单位[:：]).*")) break;
+            boolean startsAnother = SPECS.stream().filter(spec -> spec.fieldId().startsWith("reconciliation_"))
+                    .flatMap(spec -> spec.aliases().stream()).anyMatch(alias -> lineStartsAlias(next, alias));
+            if (startsAnother || next.matches("^[123]．.*")) break;
+            joined.append(' ').append(next);
+            numbers = readNumbers(joined.toString());
+            wrappedToNextRow = true;
+        }
+        if (numbers.isEmpty()) return null;
+        List<BigDecimal> values = readNumbers(joined.toString());
+        if (values.isEmpty()) return null;
+        if (wrappedTaxLine && wrappedToNextRow && values.size() >= 2) {
+            // The report wraps the current-period value below the label while the
+            // prior-period value remains on the label row.
+            values = List.of(values.get(1), values.get(0));
+        }
+        return enrich(toLine(match, values, page, unit, "consolidated", file, joined.toString()), context)
+                .toBuilder().sourceSection("cash_flow_reconciliation").statementType("cash_flow_reconciliation").periodType("annual").build();
+    }
+
+    private static boolean isDeferredTaxReconciliation(String fieldId) {
+        return "reconciliation_deferred_tax_assets".equals(fieldId)
+                || "reconciliation_deferred_tax_liabilities".equals(fieldId);
+    }
+
+    /** 附注逐行识别现金调节项目；跨页只传递标题，不把同业存款重复计入货币资金。 */
+    private void parseCashNotes(List<PageText> pages, PageText page, String file, List<ExtractedLine> found, ParseContext periodContext) {
+        String preceding = pages.stream().filter(p -> p.getPageNumber() == page.getPageNumber() - 1)
+                .map(PageText::getText).findFirst().orElse("");
+        String context = preceding + page.getText();
+        // PDF 页眉常把年份与“年”分开排版（如“2023 年年度报告”）；若未识别，
+        // 现金附注会错误继承上一张主表的期间，进而触发净债务期间冲突。
+        Matcher reportYear = Pattern.compile("(20\\d{2})\\s*年\\s*年度报告").matcher(normalize(page.getText()));
+        String cashDate = reportYear.find() ? reportYear.group(1) + "-12-31" : periodContext.asOfDate;
+        for (String row : page.getText().split("\\R")) {
+            String text = normalize(row);
+            String id = null;
+            String name = null;
+            if (text.contains("银行承兑汇票保证金") && context.contains("使用受限")) { id = "restricted_cash"; name = "受限货币资金"; }
+            if (text.startsWith("存放中央银行法定存款准备金") && context.contains("使用受到限制的货币资金")) { id = "restricted_cash"; name = "法定存款准备金（受限货币资金）"; }
+            if (text.startsWith("计提的定期存款利息")) { id = "accrued_deposit_interest"; name = "应计定期存款利息"; }
+            if (text.contains("期末现金及现金等价物余额")) { id = "cash_equivalents"; name = "现金及现金等价物"; }
+            if (text.startsWith("不能随时支取的同业存款")) { id = "restricted_interbank"; name = "受限同业存款（拆出资金，非货币资金）"; }
+            if (id == null) continue;
+            List<BigDecimal> values = readNumbers(text);
+            if (values.isEmpty()) continue;
+            found.add(toLine(new Spec(id, name, List.of(name)), values, page.getPageNumber(), "元", "consolidated", file, page.getText())
+                    .toBuilder().sourceSection("notes").statementType("cash_note").periodType("point_in_time")
+                    .asOfDate(cashDate).periodStart(cashDate == null ? null : cashDate.substring(0, 4) + "-01-01").periodEnd(cashDate)
+                    .selectionReason("cash_note_named_row").dataQualityStatus("VALUE_AVAILABLE").build());
+        }
+    }
+
+    private static boolean isBalanceField(String id) {
+        return List.of("total_assets", "total_liabilities", "net_assets", "total_equity", "cash", "restricted_cash", "notes_receivable", "accounts_receivable", "inventory", "goodwill", "current_assets", "current_liabilities", "short_term_debt", "current_portion_debt", "bonds_payable", "lease_liabilities", "long_term_debt", "minority_interest", "share_capital", "shares_outstanding").contains(id);
     }
 
     private static boolean isAnnualSummaryMonetaryField(String fieldId) {
@@ -499,10 +636,6 @@ public class StatementExtractor {
             context.statementType = "cash_flow_statement";
             context.periodType = "annual";
             context.scope = "parent";
-        } else if (line.contains("现金流量表补充资料") || line.contains("将净利润调节为经营活动现金流量")) {
-            context.section = "cash_flow_reconciliation";
-            context.statementType = "cash_flow_reconciliation";
-            context.periodType = "annual";
         }
         Matcher years = Pattern.compile("(20\\d{2})年?").matcher(line);
         if (context.inNotes && "audited_annual_main".equals(context.section)) context.section = "notes";
@@ -545,7 +678,7 @@ public class StatementExtractor {
             List<BigDecimal> numbers = readNumbers(line);
             String letters = line.replaceAll("[0-9,，.\\-()（）\\s%/／]", "");
             if (line.startsWith("合计") && !numbers.isEmpty()) {
-                found.add(toLine(new FieldSpec("nri_total", "非经常性损益合计", List.of("合计")), numbers, page, unit, scope, sourceFile, line));
+                found.add(toLine(new Spec("nri_total", "非经常性损益合计", List.of("合计")), numbers, page, unit, scope, sourceFile, line));
                 label.setLength(0);
                 // The total row is the contractual end of the non-recurring-items
                 // table. Do not carry the section into later pages where unrelated
@@ -565,9 +698,8 @@ public class StatementExtractor {
                 if (i + 1 < rows.length) {
                     around.append(normalize(rows[i + 1]));
                 }
-                Spec wrapped = nriSpec(around.toString());
                 String window = around.substring(Math.max(0, around.length() - 48));
-                FieldSpec wrapped = nriSpec(window);
+                Spec wrapped = nriSpec(window);
                 if (wrapped != null) {
                     found.add(toLine(wrapped, numbers, page, unit, scope, sourceFile, around + " " + line));
                 }
@@ -578,29 +710,29 @@ public class StatementExtractor {
         }
     }
 
-    private static FieldSpec nriSpec(String label) {
+    private static Spec nriSpec(String label) {
         if (label.contains("公允价值")) {
-            return new FieldSpec("nri_fair_value", "公允价值变动损益", List.of("公允价值变动损益"));
+            return new Spec("nri_fair_value", "公允价值变动损益", List.of("公允价值变动损益"));
         }
         if (label.contains("资产处置")) {
-            return new FieldSpec("nri_disposal", "资产处置损益", List.of("资产处置损益"));
+            return new Spec("nri_disposal", "资产处置损益", List.of("资产处置损益"));
         }
         if (label.contains("政府补助")) {
             return new Spec("nri_subsidy", "政府补助", List.of("政府补助"));
         }
         if (label.contains("其他营业外")) {
-            return new FieldSpec("nri_other", "其他营业外收支", List.of("其他营业外收支"));
+            return new Spec("nri_other", "其他营业外收支", List.of("其他营业外收支"));
         }
         if (label.contains("资金占用费")) return new Spec("nri_fund_occupation", "资金占用费", List.of("资金占用费"));
         if (label.contains("减值准备转回")) return new Spec("nri_impairment_reversal", "应收款项减值准备转回", List.of("减值准备转回"));
         if (label.contains("其他符合非经常性")) {
-            return new FieldSpec("nri_other_defined", "其他非经常性损益", List.of("其他非经常性损益"));
+            return new Spec("nri_other_defined", "其他非经常性损益", List.of("其他非经常性损益"));
         }
         if (label.contains("所得税影响")) {
-            return new FieldSpec("nri_tax", "所得税影响额", List.of("所得税影响额"));
+            return new Spec("nri_tax", "所得税影响额", List.of("所得税影响额"));
         }
         if (label.contains("少数股东权益影响")) {
-            return new FieldSpec("nri_minority_impact", "少数股东权益影响额", List.of("少数股东权益影响额"));
+            return new Spec("nri_minority_impact", "少数股东权益影响额", List.of("少数股东权益影响额"));
         }
         return null;
     }
@@ -699,7 +831,9 @@ public class StatementExtractor {
             default -> -50;
         };
         int score = section + scope + (line.getPrior() != null ? 1 : 0);
-        if ("positioned_table".equals(line.getSelectionReason())) score += 2000;
+        // 定位表格只有在合并口径下才提升优先级；母公司权益变动表常把股本列
+        // 误识别为合并权益，不能压过合并资产负债表的直接披露。
+        if ("positioned_table".equals(line.getSelectionReason()) && "consolidated".equals(line.getScope())) score += 2000;
         if ("annual_summary_columns".equals(line.getSelectionReason())) score += 2000;
         if ("annual_summary".equals(line.getSourceSection())
                 && ("net_profit_deducted".equals(line.getFieldId()) || "weighted_average_roe".equals(line.getFieldId()))) {
@@ -754,8 +888,11 @@ public class StatementExtractor {
         if (value.scale() > 0 || value.abs().compareTo(new BigDecimal("100")) >= 0) {
             return false;
         }
-        Matcher matcher = NUMBER.matcher(tail);
-        return matcher.find() && matcher.group().matches("\\d{1,2}");
+        // PDF text often places a footnote marker (for example "1") directly
+        // before the first amount. Do not fold that marker into the amount.
+        if (tail == null) return false;
+        String prefixTrimmed = tail.replaceFirst("^[^0-9-]+", "");
+        return prefixTrimmed.matches("\\d{1,2}\\s+(?=\\d[\\d,]*\\.\\d+).*");
     }
 
     private static String detectUnit(String text) {
@@ -828,6 +965,7 @@ public class StatementExtractor {
     private static StatementExtract withFile(StatementExtract body, String path, String sha256, int pageCount) {
         return StatementExtract.builder()
                 .lines(body.getLines())
+                .candidates(body.getCandidates())
                 .policyNotes(body.getPolicyNotes())
                 .sourcePath(path)
                 .sha256(sha256)
@@ -863,14 +1001,27 @@ public class StatementExtractor {
     /** Preserve column positions: a blank current cell must not shift the prior value left. */
     private void parsePositionedTables(PageText page, String unit, String file, List<ExtractedLine> found, ParseContext context) {
         List<PageText.PositionedRow> rows = page.getRows();
+        String pageText = page.getText() == null ? "" : page.getText();
+        boolean reconciliationPage = pageText.contains("现金流量表补充资料")
+                && pageText.contains("将净利润调节为经营活动现金流量");
+        boolean reconciliationDone = false;
+        if (reconciliationPage) {
+            context.section = "cash_flow_reconciliation";
+            context.statementType = "cash_flow_reconciliation";
+            context.periodType = "annual";
+            context.scope = "consolidated";
+        }
         boolean pageNotes = page.getText() != null && page.getText().contains("财务附注中报表")
                 && !page.getText().contains("二、财务报表");
         String pending = "";
         boolean nri = false;
-        boolean priorBeforeAdjustment = normalize(page.getText()).contains("调整前") && normalize(page.getText()).contains("调整后");
+        boolean hasAdjustments = normalize(page.getText()).contains("调整前") && normalize(page.getText()).contains("调整后");
         for (int i = 0; i < rows.size(); i++) {
             var row = rows.get(i);
             String raw = row.text();
+            if (reconciliationPage && raw.contains("经营活动产生的现金流量净额")) {
+                reconciliationDone = true;
+            }
             if (nri && raw.contains("其他营业外")) pending = "";
             updateContext(raw, context);
             if (pageNotes) {
@@ -885,9 +1036,12 @@ public class StatementExtractor {
                     .toList();
             String next = i + 1 < rows.size() && rows.get(i + 1).numbers().isEmpty() ? rows.get(i + 1).text() : "";
             String nextLabel = normalize(next);
+            if (!nri && !cells.isEmpty() && !pending.isEmpty() && raw.matches(".*[\u4e00-\u9fff]{3,}.*") && !normalize(pending + raw).contains("所有者权益")) pending = "";
             if (!nri && SPECS.stream().anyMatch(s -> s.aliases().stream().anyMatch(nextLabel::startsWith))) next = "";
             String label = normalize(pending + raw + next).replaceAll("[0-9,，.\\-%]+", "");
+            boolean allowReconciliation = reconciliationPage && !reconciliationDone;
             Spec spec = nri ? nriSpec(label) : SPECS.stream()
+                    .filter(s -> !s.fieldId().startsWith("reconciliation_") || allowReconciliation)
                     .filter(s -> s.aliases().stream().anyMatch(label::contains))
                     .max(java.util.Comparator.comparingInt(s -> s.aliases().stream().filter(label::contains).mapToInt(String::length).max().orElse(0)))
                     .orElse(null);
@@ -904,18 +1058,29 @@ public class StatementExtractor {
                 continue;
             }
             List<PageText.NumberCell> amounts = cells.stream().filter(c -> !c.text().endsWith("%") && (c.text().contains(".") || c.text().contains(","))).toList();
+            if (reconciliationPage && amounts.size() == 1 && (label.contains("递延所得税资产减少") || label.contains("递延所得税负债增加"))
+                    && i + 1 < rows.size() && rows.get(i + 1).numbers().size() == 1) {
+                var nextCell = rows.get(i + 1).numbers().get(0);
+                if (nextCell.text().contains(".") || nextCell.text().contains(",")) {
+                    // Some annual reports wrap the current-period value to the next visual row
+                    // while leaving the prior-period value aligned on the label row.
+                    cells = java.util.stream.Stream.concat(cells.stream(), rows.get(i + 1).numbers().stream()).toList();
+                    amounts = cells.stream().filter(c -> !c.text().endsWith("%") && (c.text().contains(".") || c.text().contains(","))).toList();
+                    i++;
+                }
+            }
             if (amounts.isEmpty()) {
                 if (main && "balance_sheet".equals(context.statementType) && raw.trim().equals(spec.aliases().get(0))) {
                     found.add(enrich(toLine(spec, List.of(BigDecimal.ZERO), page.getPageNumber(), unit, context.scope, file, raw), context)
                             .toBuilder().selectionReason("positioned_table").dataQualityStatus("DISCLOSED_ZERO")
                             .missingReason("主表对应金额单元格为空，已按列位置验证为零").build());
                 }
-                pending += raw;
+                pending = main && "balance_sheet".equals(context.statementType) ? "" : pending + raw;
                 continue;
             }
-            BigDecimal current = parseNumber(amounts.get(0).text());
-            BigDecimal prior = amounts.size() > 1 ? parseNumber(amounts.get(1).text()) : null;
-            if (summary && priorBeforeAdjustment && amounts.size() > 2) prior = parseNumber(amounts.get(2).text());
+            BigDecimal current = parsePositionedNumber(amounts.get(0).text());
+            BigDecimal prior = amounts.size() > 1 ? parsePositionedNumber(amounts.get(1).text()) : null;
+            if (summary && hasAdjustments && amounts.size() > 2) prior = parseNumber(amounts.get(adjustedPriorIndex(page.getText())).text());
             if (main && "balance_sheet".equals(context.statementType)) {
                 if (amounts.size() >= 2) {
                     context.currentX = amounts.get(0).endX(); context.priorX = amounts.get(1).endX();
@@ -927,6 +1092,7 @@ public class StatementExtractor {
             ExtractedLine parsed = enrich(toLine(spec, prior == null ? List.of(current) : List.of(current, prior), page.getPageNumber(), unit,
                     nri ? "consolidated" : context.scope, file, pending + raw + next), context);
             if (nri) parsed = parsed.toBuilder().sourceSection("notes").statementType("non_recurring").periodType("annual").scope("consolidated").build();
+            if (summary && hasAdjustments) parsed = parsed.toBuilder().priorColumn(context.priorColumn + " 调整后").build();
             if (summary) {
                 final Spec selectedSpec = spec;
                 var percentages = cells.stream().filter(c -> c.text().endsWith("%")).toList();
@@ -955,8 +1121,17 @@ public class StatementExtractor {
             if (!glyphs.isEmpty()) {
                 StringBuilder text = new StringBuilder();
                 List<TextPosition> chars = new ArrayList<>();
-                for (TextPosition glyph : glyphs) for (int n = 0; n < glyph.getUnicode().length(); n++) {
-                    text.append(glyph.getUnicode().charAt(n)); chars.add(glyph);
+                TextPosition previous = null;
+                for (TextPosition glyph : glyphs) {
+                    if (previous != null) {
+                        float gap = glyph.getXDirAdj() - previous.getXDirAdj() - previous.getWidthDirAdj();
+                        float space = Math.max(1f, Math.min(previous.getWidthOfSpace(), glyph.getWidthOfSpace()) * 0.5f);
+                        if (gap > space) { text.append(' '); chars.add(previous); }
+                    }
+                    for (int n = 0; n < glyph.getUnicode().length(); n++) {
+                        text.append(glyph.getUnicode().charAt(n)); chars.add(glyph);
+                    }
+                    previous = glyph;
                 }
                 List<PageText.NumberCell> cells = new ArrayList<>();
                 Matcher matcher = Pattern.compile("-?\\d[\\d,]*(?:\\.\\d+)?%?").matcher(text);

@@ -27,10 +27,10 @@ yoy:
   net_profit: "0.5"
 ratios:
   gross_margin: "0.4"
-  roe: "0.125"
+  roe: null
 articulation: PASS
 anomalies:
   - NON_RECURRING_ITEMS
   - PROFIT_CASHFLOW_DIVERGENCE
   - ACCOUNTING_POLICY_CHANGE
-valuation_range: present
+valuation_range: absent

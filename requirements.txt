@@ -1,0 +1,64 @@
+# FinAI 安装依赖清单
+# Windows 一键安装项目依赖：
+#   powershell -ExecutionPolicy Bypass -File .\scripts\install-dependencies.ps1
+# 先安装下列运行/构建工具；脚本检查工具后执行 Maven 打包和 npm ci。
+# 当前没有 Python 包依赖，因此 pip install -r requirements.txt 不会安装任何包。
+# 不把 Java/npm 包写成 pip 条目，避免 pip 安装错误或同名的无关 Python 包。
+#
+# 必需工具（独立安装，不由 pip 管理）
+#   JDK >= 17
+#   Apache Maven >= 3.6
+#   Node.js >= 18（包含 npm；建议使用仍受支持的 LTS）
+#
+# 后端安装包：版本与传递依赖以 backend/pom.xml 为准。
+# Spring Boot 父版本 3.2.0 管理未明确列出版本的依赖。
+#   org.springframework.boot:spring-boot-starter-web
+#   org.springframework.boot:spring-boot-starter-data-jpa
+#   org.springframework.boot:spring-boot-starter-validation
+#   org.springframework.boot:spring-boot-starter-actuator
+#   org.springframework.boot:spring-boot-starter-cache
+#   dev.langchain4j:langchain4j:0.35.0
+#   dev.langchain4j:langchain4j-anthropic:0.35.0
+#   dev.langchain4j:langchain4j-open-ai:0.35.0
+#   com.h2database:h2
+#   org.apache.pdfbox:pdfbox:3.0.1
+#   org.apache.pdfbox:pdfbox-tools:3.0.1
+#   org.apache.poi:poi:5.2.5
+#   org.apache.poi:poi-ooxml:5.2.5
+#   com.fasterxml.jackson.core:jackson-databind
+#   com.fasterxml.jackson.dataformat:jackson-dataformat-yaml
+#   com.fasterxml.jackson.datatype:jackson-datatype-jsr310
+#   org.projectlombok:lombok:1.18.42
+#   org.apache.commons:commons-lang3
+#   org.apache.commons:commons-collections4:4.4
+#   commons-io:commons-io:2.15.1
+#   org.apache.commons:commons-math3:3.6.1
+#   org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0
+#   io.micrometer:micrometer-registry-prometheus
+# 测试包：
+#   org.springframework.boot:spring-boot-starter-test
+#   org.junit.jupiter:junit-jupiter
+#   org.mockito:mockito-core
+#   org.assertj:assertj-core
+#
+# 前端安装包：声明以 frontend/package.json 为准，npm ci 使用 package-lock.json 锁定版本。
+#   @ant-design/icons ^5.2.6
+#   antd ^5.12.0
+#   axios ^1.6.2
+#   dayjs ^1.11.10
+#   lodash ^4.17.21
+#   lucide-react ^1.47.0
+#   markdown-it ^14.0.0
+#   react ^18.2.0
+#   react-dom ^18.2.0
+#   react-router-dom ^6.20.0
+#   recharts ^2.15.4
+# 开发/构建包：
+#   @types/react ^18.2.43
+#   @types/react-dom ^18.2.17
+#   @vitejs/plugin-react ^4.2.1
+#   eslint ^8.55.0
+#   eslint-plugin-react ^7.33.2
+#   eslint-plugin-react-hooks ^4.6.0
+#   eslint-plugin-react-refresh ^0.4.5
+#   vite ^5.4.21

@@ -42,14 +42,16 @@ public class ValuationEngine {
     public ValuationResultDTO evaluate(List<ExtractedLine> lines, FinancialMetricsDTO metrics,
                                        ValuationParameters parameters) {
         if (parameters == null) parameters = ValuationParameters.builder().build();
+        if (parameters.getInputMode() != null || parameters.getForecast() != null) return AnnualDcfModel.evaluate(parameters, metrics, lines);
+        Map<String, ExtractedLine> byField = lines.stream()
+                .collect(Collectors.toMap(ExtractedLine::getFieldId, Function.identity(), (a, b) -> a));
+        ValuationResultDTO diagnostic = NetDebtDiagnostics.attach(new ValuationResultDTO(), byField, parameters);
         BigDecimal wacc = parameters.getWacc();
         BigDecimal terminalGrowth = parameters.getTerminalGrowth();
         int years = parameters.getYears();
         if (wacc == null || terminalGrowth == null || years < 1 || wacc.compareTo(terminalGrowth) <= 0) {
-            return blocked("BLOCKED_BY_DATA_QUALITY", "WACC、终值增长率或预测期不满足模型边界。", new ArrayList<>());
+            return withDiagnostic(blocked("BLOCKED_BY_DATA_QUALITY", "WACC、终值增长率或预测期不满足模型边界。", new ArrayList<>()), diagnostic);
         }
-        Map<String, ExtractedLine> byField = lines.stream()
-                .collect(Collectors.toMap(ExtractedLine::getFieldId, Function.identity(), (a, b) -> a));
         List<ValuationResultDTO.ValuationAssumption> assumptions = new ArrayList<>();
         FinancialMetricsDTO.CoreMetrics core = metrics.getCoreMetrics();
         BigDecimal ocf = core == null ? null : core.getOperatingCashFlow();
@@ -95,10 +97,10 @@ public class ValuationEngine {
                     || parameters.getMinorityAdjustment() == null
                     || parameters.getNonCoreAssets() == null;
             if (bridgeInputMissing) {
-                assumptions.add(assumption("\u51c0\u503a\u52a1", "\u672a\u8ba1\u7b97\uff08\u6865\u63a5\u8f93\u5165\u4e0d\u5b8c\u6574\uff09", "formula",
-                        "\u73b0\u91d1\u3001\u6709\u606f\u503a\u52a1\u3001\u5c11\u6570\u80a1\u4e1c\u548c\u975e\u6838\u5fc3\u8d44\u4ea7\u6865\u63a5\u8f93\u5165\u4e0d\u5b8c\u6574\uff0c\u672a\u8ba1\u7b97\u51c0\u503a\u52a1\u3002"));
+                assumptions.add(assumption("净债务诊断", diagnostic.getNetDebtDiagnostic() == null ? "输入不完整" : diagnostic.getNetDebtDiagnostic().toPlainString(), "formula",
+                        diagnostic.getNetDebtDiagnosticFormula() + "；正式股权桥接另需确认少数股东和非核心资产政策。"));
             }
-            return blocked("INPUT_INCOMPLETE", String.join("；", missing), assumptions);
+            return withDiagnostic(blocked("INPUT_INCOMPLETE", String.join("；", missing), assumptions), diagnostic);
         }
         if (parameters.getConfirmedFcff().signum() <= 0 || parameters.getDilutedShares().signum() <= 0
                 || parameters.getUsableCash().signum() < 0 || parameters.getGrossDebt().signum() < 0
@@ -168,7 +170,9 @@ public class ValuationEngine {
                         .methodology("推论：" + years + "年 FCFF 折现加戈登终值。区间取悲观/基准/乐观增速（基准增速 ±2 个百分点）的" + basis + "。")
                         .applicabilityNote("按确认政策扣净债务及少数股东调整、加非核心资产，以确认摊薄股数计算每股价值。相对估值因没有可比公司和市价未计算。不构成投资建议。")
                         .build())
-                .build();
+                .netDebtDiagnostic(diagnostic.getNetDebtDiagnostic()).netDebtDiagnosticStatus(diagnostic.getNetDebtDiagnosticStatus())
+                .netDebtDiagnosticMissingItems(diagnostic.getNetDebtDiagnosticMissingItems())
+                .netDebtDiagnosticFormula(diagnostic.getNetDebtDiagnosticFormula()).netDebtDiagnosticInputs(diagnostic.getNetDebtDiagnosticInputs()).build();
     }
 
     private ValuationResultDTO blocked(String status, String reason, List<ValuationResultDTO.ValuationAssumption> assumptions) {
@@ -176,23 +180,13 @@ public class ValuationEngine {
         return ValuationResultDTO.builder().businessStatus(status).blockReason(reason).assumptions(assumptions).build();
     }
 
-    private BigDecimal netDebt(Map<String, ExtractedLine> byField, List<ValuationResultDTO.ValuationAssumption> assumptions) {
-        ExtractedLine cash = byField.get("cash");
-        ExtractedLine restrictedCash = byField.get("restricted_cash");
-        List<String> debtFields = List.of("short_term_debt", "current_portion_debt", "bonds_payable", "lease_liabilities", "long_term_debt");
-        List<ExtractedLine> debtLines = debtFields.stream().map(byField::get).toList();
-        if (!usableBalanceSheet(cash) || !usableBalanceSheet(restrictedCash)
-                || debtLines.stream().anyMatch(line -> !usableBalanceSheet(line))
-                || debtLines.stream().anyMatch(line -> !cash.getUnit().equals(line.getUnit()))) {
-            assumptions.add(assumption("净债务", "未计算（桥接输入不完整）", "formula",
-                    "需齐备货币资金、受限资金、短期借款、一年内到期债务、应付债券、租赁负债和长期借款。"));
-            return null;
-        }
-        BigDecimal grossDebt = debtLines.stream().map(ExtractedLine::getCurrent).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal netDebt = grossDebt.subtract(cash.getCurrent()).add(restrictedCash.getCurrent());
-        assumptions.add(assumption("净债务", netDebt.toPlainString(), "formula",
-                "公式：全部有息债务 − 货币资金 + 受限资金。财务公司资金按已确认的受限资金口径处理。"));
-        return netDebt;
+    private ValuationResultDTO withDiagnostic(ValuationResultDTO result, ValuationResultDTO diagnostic) {
+        result.setNetDebtDiagnostic(diagnostic.getNetDebtDiagnostic());
+        result.setNetDebtDiagnosticStatus(diagnostic.getNetDebtDiagnosticStatus());
+        result.setNetDebtDiagnosticMissingItems(diagnostic.getNetDebtDiagnosticMissingItems());
+        result.setNetDebtDiagnosticFormula(diagnostic.getNetDebtDiagnosticFormula());
+        result.setNetDebtDiagnosticInputs(diagnostic.getNetDebtDiagnosticInputs());
+        return result;
     }
 
     private ValuationResultDTO.DCFValuation.Scenario scenario(String name, BigDecimal fcff0, BigDecimal growth,
@@ -270,11 +264,6 @@ public class ValuationEngine {
         return left != null && right != null && left.getUnit() != null && left.getUnit().equals(right.getUnit())
                 && "consolidated".equals(left.getScope()) && left.getScope().equals(right.getScope())
                 && "annual".equals(left.getPeriodType()) && left.getPeriodType().equals(right.getPeriodType());
-    }
-
-    private static boolean usableBalanceSheet(ExtractedLine line) {
-        return line != null && line.getCurrent() != null && "consolidated".equals(line.getScope())
-                && "point_in_time".equals(line.getPeriodType()) && line.getUnit() != null;
     }
 
     private static ValuationResultDTO.ValuationAssumption assumption(String parameter, String value, String source, String rationale) {

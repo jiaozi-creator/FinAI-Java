@@ -1,6 +1,6 @@
 package com.finai.analysis;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.finai.config.LlmRuntime;
 import com.finai.model.AnalysisTask;
 import com.finai.model.dto.AnalysisReportDTO;
 import com.finai.model.dto.AnomalySignalDTO;
@@ -18,12 +18,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ReportComposer {
 
-    private final ChatLanguageModel chatLanguageModel;
-    private final AuditLogService auditLogService;
-    private final ObjectMapper objectMapper;
-
-    @Value("${finai.llm.model:qwen3.7-flash}")
-    private String modelName;
+    private final SkillNarrator skillNarrator;
+    private final LlmRuntime llmRuntime;
 
     public AnalysisReportDTO compose(AnalysisTask task,
                                      StatementExtract extract,
@@ -119,43 +115,6 @@ public class ReportComposer {
         return text.toString();
     }
 
-    private Narrative narrative(AnalysisTask task, FinancialMetricsDTO metrics, List<ArticulationCheck> checks,
-                                List<AnomalySignalDTO> anomalies, ValuationResultDTO valuation) {
-        String growth = growthText(metrics);
-        String profit = profitText(metrics);
-        String cash = cashText(metrics, anomalies);
-        String overall = overallText(checks, anomalies, valuation);
-        if ("DEMO01".equals(task.getCompanyCode())) {
-            return new Narrative(growth, profit, cash, overall, false);
-        }
-        String taskId = task.getTaskId();
-        String facts = growth + "\n" + profit + "\n" + cash + "\n" + overall;
-        long started = System.currentTimeMillis();
-        try {
-            String prompt = loadPrompt() + "\n\n已计算材料：\n" + facts;
-            String answer = chatLanguageModel.generate(UserMessage.from(prompt)).content().text();
-            auditLogService.logLLMRequest(taskId, modelName, prompt, answer,
-                    System.currentTimeMillis() - started);
-            if (answer == null || answer.contains("模拟的AI回复")) {
-                return new Narrative(growth, profit, cash, overall, false);
-            }
-            String json = answer.trim();
-            int start = json.indexOf('{');
-            int end = json.lastIndexOf('}');
-            if (start >= 0 && end > start) {
-                objectMapper.readTree(json.substring(start, end + 1));
-                // 模型表述未经证据复核，不覆盖确定性计算结果。
-                return new Narrative(growth, profit, cash,
-                        overall + " 模型建议已生成，但未经证据复核，未纳入正式结论。", true);
-            }
-            return new Narrative(growth, profit, cash, overall + " 模型回复格式无效，已使用程序报告（降级）。", false);
-        } catch (Exception e) {
-            log.warn("Narrative model unavailable: {}", e.getClass().getSimpleName());
-            auditLogService.logError(taskId, "LLM_CALL", e.getClass().getSimpleName());
-            return new Narrative(growth, profit, cash, overall + " 模型不可用，已使用程序报告（降级）。", false);
-        }
-    }
-
     private String growthText(FinancialMetricsDTO metrics) {
         BigDecimal revenueGrowth = metrics.getYoyGrowth() == null ? null : metrics.getYoyGrowth().getRevenueGrowth();
         BigDecimal profitGrowth = metrics.getYoyGrowth() == null ? null : metrics.getYoyGrowth().getNetProfitGrowth();
@@ -178,10 +137,10 @@ public class ReportComposer {
 
     private String cashText(FinancialMetricsDTO metrics, List<AnomalySignalDTO> anomalies) {
         FinancialMetricsDTO.FinancialRatios ratios = metrics.getRatios();
-        String ratio = ratios == null ? "未提取" : pct(ratios.getOcfToNetProfit());
+        String ratio = ratios == null || ratios.getOcfToNetProfit() == null ? "数据不可用" : ratios.getOcfToNetProfit().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() + "倍";
         boolean hit = anomalies.stream().anyMatch(item -> item.getType() == AnomalySignalDTO.AnomalyType.PROFIT_CASHFLOW_DIVERGENCE && "TRIGGERED".equals(item.getResultStatus()));
         return "事实：经营现金流/归母净利润 = " + ratio + "。"
-                + (hit ? "推论：已触发利润与现金流背离规则。" : "推论：未触发利润与现金流背离规则。");
+                + (hit ? "推论：已触发利润与现金流背离规则。" : anomalies.stream().anyMatch(a -> a.getType() == AnomalySignalDTO.AnomalyType.PROFIT_CASHFLOW_DIVERGENCE && "NOT_TRIGGERED".equals(a.getResultStatus())) ? "推论：未触发利润与现金流背离规则。" : "规则输入不可用，尚不能判断背离。");
     }
 
     private String overallText(List<ArticulationCheck> checks, List<AnomalySignalDTO> anomalies, ValuationResultDTO valuation) {
@@ -190,14 +149,6 @@ public class ReportComposer {
                 ? "估值区间未计算"
                 : "估值中值 " + valuation.getValuationRange().getMid();
         return "事实：勾稽 " + check + "。异常 " + anomalies.size() + " 条。推论：" + range + "。";
-    }
-
-    private String loadPrompt() {
-        try {
-            return new ClassPathResource("prompts/report-narrative.md").getContentAsString(StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            return "只根据给定数字写推论，不要新增数字。输出 JSON。";
-        }
     }
 
     private static String pct(BigDecimal value) {

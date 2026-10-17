@@ -36,25 +36,26 @@ function ChatAnalysis() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  const handleAsk = async () => {
-    const text = question.trim()
+  const handleAsk = async (retry) => {
+    const text = retry?.text || question.trim()
     if (!text || loading) return
-    setMessages((prev) => [...prev, { role: 'user', content: text }])
+    const requestId = retry?.requestId || crypto.randomUUID()
+    if (!retry) setMessages((prev) => [...prev, { role: 'user', content: text, requestId }])
     setQuestion('')
     setLoading(true)
     try {
-      const data = await api.post(`/chat/${taskId}/ask`, { question: text })
-      setMessages((prev) => [...prev, {
-        role: 'assistant',
-        content: data.answer,
-        evidence: data.evidences,
-        confidence: data.confidence,
-      }])
+      const data = await api.post(`/chat/${taskId}/ask`, { question: text, requestId })
+      const history = await api.get(`/chat/${taskId}/history`)
+      setMessages(history || [{ role: 'assistant', content: data.answer }])
     } catch (error) {
-      setMessages((prev) => [...prev, {
+      let recovered = []
+      try { recovered = await api.get(`/chat/${taskId}/history`) || [] } catch {}
+      if (recovered.some(msg => msg.requestId === requestId && msg.role === 'assistant')) setMessages(recovered)
+      else setMessages((prev) => [...(recovered.length ? recovered : prev.filter(msg => !(msg.error && msg.requestId === requestId))), {
         role: 'assistant',
         content: '这次没有拿到回复。看一下后端和模型配置再试。',
         error: true,
+        requestId, retryText: text,
       }])
     } finally {
       setLoading(false)
@@ -91,6 +92,8 @@ function ChatAnalysis() {
           {messages.map((msg, index) => (
             <div key={index} className={`bubble ${msg.error ? 'error' : msg.role}`}>
               {msg.content}
+              {msg.error && <Button onClick={() => handleAsk({ text: msg.retryText, requestId: msg.requestId })} disabled={loading}>重试</Button>}
+              {msg.status === 'DEGRADED' && <small>模型回复未通过，已展示确定性事实</small>}
               {msg.evidence?.length > 0 && (
                 <div className="evidence-item">
                   {msg.evidence.map((item, i) => <div key={i}>第 {item.pageNumber ?? '-'} 页 · {item.excerpt}</div>)}

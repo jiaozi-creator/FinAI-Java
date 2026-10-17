@@ -25,6 +25,20 @@ public class ValuationResultDTO {
 
     /** 估值没有输出时的可审计原因。 */
     private String blockReason;
+    private String parameterVersion;
+    private String valuationScope;
+    private String inputStatus;
+    private String calculationStatus;
+    private BigDecimal netDebtDiagnostic;
+    private String netDebtDiagnosticStatus;
+    private List<String> netDebtDiagnosticMissingItems;
+    private String netDebtDiagnosticFormula;
+    private List<FinancialMetricsDTO.NonRecurringItem> netDebtDiagnosticInputs;
+    private List<com.finai.analysis.ValuationParameters.ForecastYear> forecastInputs;
+    private Map<String, String> bridgeSources;
+    private BigDecimal assumedPePrice;
+    private BigDecimal assumedPbPrice;
+    private String multipleSource;
 
     /**
      * DCF估值结果
@@ -81,6 +95,11 @@ public class ValuationResultDTO {
             private BigDecimal valuePerShare;    // 每股价值
             private List<BigDecimal> freeCashFlows; // 未来现金流
             private BigDecimal terminalValue;    // 终值
+            private List<BigDecimal> discountFactors;
+            private List<BigDecimal> presentValues;
+            private BigDecimal terminalPresentValue;
+            private BigDecimal terminalShare;
+            private String parameterVersion;
         }
     }
 

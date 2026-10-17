@@ -46,6 +46,10 @@ outputs/reports/*
 outputs/evidence/*
 !outputs/reports/.gitkeep
 !outputs/evidence/.gitkeep
+results/*.html
+outputs/**/*.html
+*.export.json
+!results/frozen/
 
 # Dependencies
 node_modules/

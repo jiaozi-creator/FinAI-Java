@@ -34,7 +34,7 @@ public class ChatAnalysisController {
         String question = request.get("question");
         log.info("Received question for task {}: {}", taskId, question);
 
-        ChatResponseDTO response = chatAnalysisService.askQuestion(taskId, question);
+        ChatResponseDTO response = chatAnalysisService.askQuestion(taskId, question, request.get("requestId"));
         return ResponseEntity.ok(response);
     }
 

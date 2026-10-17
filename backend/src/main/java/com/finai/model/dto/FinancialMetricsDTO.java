@@ -67,6 +67,34 @@ public class FinancialMetricsDTO {
 
     /** Per-field calculation provenance and standardized missing reason. */
     private Map<String, MetricResult> metricDetails;
+    private DuPontAnalysis duPontAnalysis;
+    private CashFlowReconciliation cashFlowReconciliation;
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class DuPontAnalysis {
+        private BigDecimal netMargin;
+        private BigDecimal averageAssetTurnover;
+        private BigDecimal averageEquityMultiplier;
+        private BigDecimal decomposedRoe;
+        private BigDecimal averageEquityRoe;
+        private String status;
+        private String explanation;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class CashFlowReconciliation {
+        private BigDecimal consolidatedNetProfit;
+        private BigDecimal adjustmentTotal;
+        private List<NonRecurringItem> adjustments;
+        private BigDecimal calculatedOperatingCashFlow;
+        private BigDecimal reportedOperatingCashFlow;
+        private BigDecimal residual;
+        private String status;
+        private String reason;
+        private String currentPeriod;
+        private String scope;
+        private String unit;
+    }
 
     @Data
     @Builder
@@ -84,6 +112,13 @@ public class FinancialMetricsDTO {
         private List<EvidenceDTO> evidenceRefs;
         private Integer displayScale;
         private String source;
+        private BigDecimal currentValue;
+        private BigDecimal priorValue;
+        private BigDecimal disclosedValue;
+        private BigDecimal calculatedValue;
+        private String currentColumn;
+        private String priorColumn;
+        private String precisionNote;
     }
 
     @Data
@@ -94,8 +129,15 @@ public class FinancialMetricsDTO {
         private String fieldId;
         private String name;
         private BigDecimal amount;
+        private BigDecimal priorAmount;
         private Integer page;
         private String snippet;
+        private String dataQualityStatus;
+        private String period;
+        private String scope;
+        private String unit;
+        private String sourceFile;
+        private String deductionRole;
     }
 
     /**
@@ -124,6 +166,10 @@ public class FinancialMetricsDTO {
         private BigDecimal minorityInterest;        // 少数股东权益
         private BigDecimal totalEquity;              // 合并权益
         private BigDecimal cash;                     // 货币资金
+        private BigDecimal restrictedCash;
+        private BigDecimal cashEquivalents;
+        private BigDecimal accruedDepositInterest;
+        private BigDecimal restrictedInterbank;
         private BigDecimal notesReceivable;          // 应收票据
         private BigDecimal sharesOutstanding;       // 期末总股本
         private BigDecimal basicEps;                // 基本每股收益

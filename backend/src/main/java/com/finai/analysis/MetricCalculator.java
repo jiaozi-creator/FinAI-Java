@@ -18,7 +18,7 @@ public class MetricCalculator {
     private static final int SCALE = 8;
     private static final List<String> DISPLAY_FIELDS = List.of(
             "revenue", "net_profit", "net_profit_deducted", "operating_cash_flow",
-            "total_assets", "total_liabilities", "net_assets", "minority_interest",
+            "total_assets", "total_liabilities", "net_assets", "total_equity", "accounts_receivable", "minority_interest",
             "shares_outstanding", "basic_eps", "weighted_average_roe");
 
     public FinancialMetricsDTO calculate(List<ExtractedLine> lines, String period) {
@@ -44,6 +44,10 @@ public class MetricCalculator {
                 .minorityInterest(current(byField, "minority_interest"))
                 .totalEquity(current(byField, "total_equity"))
                 .cash(current(byField, "cash"))
+                .restrictedCash(current(byField, "restricted_cash"))
+                .cashEquivalents(current(byField, "cash_equivalents"))
+                .accruedDepositInterest(current(byField, "accrued_deposit_interest"))
+                .restrictedInterbank(current(byField, "restricted_interbank"))
                 .notesReceivable(current(byField, "notes_receivable"))
                 .sharesOutstanding(current(byField, "shares_outstanding"))
                 .basicEps(current(byField, "basic_eps"))
@@ -75,6 +79,8 @@ public class MetricCalculator {
                 .ratios(ratios(byField))
                 .nonRecurringItems(nonRecurring(lines))
                 .metricDetails(metricDetails(byField, period))
+                .duPontAnalysis(duPont(byField))
+                .cashFlowReconciliation(cashFlowReconciliation(byField))
                 .build();
     }
 
@@ -128,6 +134,8 @@ public class MetricCalculator {
                         .amount(line.getCurrent())
                         .page(line.getPage())
                         .snippet(line.getSnippet())
+                        .dataQualityStatus(line.getDataQualityStatus() == null ? "VALUE_AVAILABLE" : line.getDataQualityStatus())
+                        .deductionRole(List.of("nri_tax", "nri_minority_impact").contains(line.getFieldId()) ? "SUBTRACT_FROM_GROSS_ITEMS" : "ADD_TO_GROSS_ITEMS")
                         .build())
                 .toList();
     }
@@ -155,6 +163,48 @@ public class MetricCalculator {
                 .currentRatio(compatible(byField, "current_assets", "current_liabilities", true) ? divide(currentAssets, currentLiabilities) : null)
                 .ocfToNetProfit(compatible(byField, "operating_cash_flow", "net_profit", true) ? divide(ocf, netProfit) : null)
                 .build();
+    }
+
+    private FinancialMetricsDTO.DuPontAnalysis duPont(Map<String, ExtractedLine> fields) {
+        BigDecimal margin = ratios(fields).getNetMargin();
+        BigDecimal assets = average(fields.get("total_assets"));
+        BigDecimal equity = average(fields.get("net_assets"));
+        BigDecimal turnover = compatible(fields, "revenue", "total_assets", false) ? divide(current(fields, "revenue"), assets) : null;
+        BigDecimal multiplier = compatible(fields, "total_assets", "net_assets", true) ? divide(assets, equity) : null;
+        BigDecimal product = margin == null || turnover == null || multiplier == null ? null : margin.multiply(turnover).multiply(multiplier);
+        return FinancialMetricsDTO.DuPontAnalysis.builder().netMargin(margin).averageAssetTurnover(turnover).averageEquityMultiplier(multiplier)
+                .decomposedRoe(product).averageEquityRoe(ratios(fields).getAverageEquityRoe()).status(product == null ? "INPUT_INCOMPLETE" : "COMPUTED")
+                .explanation("归母净利率 × 营业收入/平均总资产 × 平均总资产/平均归母权益；不替代披露加权ROE").build();
+    }
+
+    private FinancialMetricsDTO.CashFlowReconciliation cashFlowReconciliation(Map<String, ExtractedLine> fields) {
+        BigDecimal profit = current(fields, "reconciliation_net_profit");
+        var adjustmentLines = fields.values().stream().filter(l -> l.getFieldId().startsWith("reconciliation_")
+                        && !"reconciliation_net_profit".equals(l.getFieldId())
+                        && !"reconciliation_operating_cash_flow".equals(l.getFieldId()))
+                .toList();
+        var adjustments = adjustmentLines.stream()
+                .map(l -> FinancialMetricsDTO.NonRecurringItem.builder().fieldId(l.getFieldId()).name(l.getFieldName())
+                        .amount(l.getCurrent()).priorAmount(l.getPrior()).page(l.getPage()).snippet(l.getSnippet())
+                        .dataQualityStatus(l.getDataQualityStatus() == null ? "VALUE_AVAILABLE" : l.getDataQualityStatus())
+                        .period(l.getPeriodStart() == null ? null : l.getPeriodStart().substring(0, 4) + "A")
+                        .scope(l.getScope()).unit(l.getUnit()).sourceFile(l.getSourceFile()).build()).toList();
+        BigDecimal adjustmentTotal = adjustmentLines.stream().map(ExtractedLine::getCurrent)
+                .filter(java.util.Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sum = profit == null ? null : profit.add(adjustmentTotal);
+        BigDecimal cfo = current(fields, "operating_cash_flow");
+        BigDecimal residual = sum == null || cfo == null ? null : cfo.subtract(sum);
+        String status = residual == null ? "INPUT_INCOMPLETE" : residual.abs().compareTo(new BigDecimal("0.01")) <= 0 ? "RECONCILED" : "RECONCILIATION_FAILED";
+        return FinancialMetricsDTO.CashFlowReconciliation.builder().consolidatedNetProfit(profit).adjustmentTotal(adjustmentTotal)
+                .adjustments(adjustments).calculatedOperatingCashFlow(sum)
+                .reportedOperatingCashFlow(cfo).residual(residual).status(status)
+                .currentPeriod(fields.values().stream().filter(l -> l.getFieldId().startsWith("reconciliation_")).map(ExtractedLine::getPeriodStart)
+                        .filter(java.util.Objects::nonNull).findFirst().map(value -> value.substring(0, 4) + "A").orElse(null))
+                .scope("consolidated")
+                .unit(fields.get("operating_cash_flow") == null ? adjustmentLines.stream().map(ExtractedLine::getUnit)
+                        .filter(java.util.Objects::nonNull).findFirst().orElse(null) : fields.get("operating_cash_flow").getUnit())
+                .reason(status.equals("RECONCILED") ? "合并净利润加本期调节项目等于合并经营现金流；调节后 CFO 未重复计入" :
+                        residual == null ? "缺少本期合并净利润、调节项目或披露 CFO，不能确认调节完整性" : "补充资料明细与披露 CFO 不符，残差表示尚未抽取或错列的净额；不得作为可信现金流归因").build();
     }
 
     private BigDecimal simpleFreeCashFlow(Map<String, ExtractedLine> byField) {
@@ -259,7 +309,7 @@ public class MetricCalculator {
         addFormulaDetail(details, "disclosed_weighted_roe", ratios.getDisclosedWeightedRoe(), "年报披露的加权平均净资产收益率", List.of("weighted_average_roe"), byField, period, "%");
         addFormulaDetail(details, "roa", ratios.getRoa(), "合并净利润/期初期末平均总资产", List.of("net_profit_consolidated", "total_assets"), byField, period, "%");
         addFormulaDetail(details, "average_equity_roe", ratios.getAverageEquityRoe(), "归母净利润/期初期末平均归母权益", List.of("net_profit", "net_assets"), byField, period, "%");
-        addFormulaDetail(details, "gross_margin", ratios.getGrossMargin(), "(营业收入－营业成本)/营业收入", List.of("revenue", "operating_cost"), byField, period, "%");
+        addFormulaDetail(details, "gross_margin", ratios.getGrossMargin(), "(合并营业收入－合并营业成本)/合并营业收入；派生毛利率，与年报酒类主营业务毛利率口径不同", List.of("revenue", "operating_cost"), byField, period, "%");
         addFormulaDetail(details, "asset_liability_ratio", ratios.getAssetLiabilityRatio(), "负债合计/资产总计", List.of("total_liabilities", "total_assets"), byField, period, "%");
         addFormulaDetail(details, "current_ratio", ratios.getCurrentRatio(), "流动资产合计/流动负债合计", List.of("current_assets", "current_liabilities"), byField, period, "倍");
         addFormulaDetail(details, "ocf_to_net_profit", ratios.getOcfToNetProfit(), "经营活动现金流/归母净利润", List.of("operating_cash_flow", "net_profit"), byField, period, "倍");
@@ -275,6 +325,22 @@ public class MetricCalculator {
             var result = detail(value, status, reason, "(本期－调整后上期)/abs(调整后上期)", List.of(id), line == null ? "unknown" : line.getScope(), period, "%", refs);
             result.setSource(line != null && "basic_eps".equals(id) && line.getDisclosedGrowth() != null ? "extract" : "formula");
             result.setDisplayScale(2);
+            if (line != null) {
+                result.setCurrentValue(line.getCurrent());
+                result.setPriorValue(line.getPrior());
+                result.setDisclosedValue(line.getDisclosedGrowth());
+                result.setCalculatedValue(calculatedGrowth(line));
+                result.setCurrentColumn(line.getCurrentColumn());
+                result.setPriorColumn(line.getPriorColumn());
+                if ("basic_eps".equals(id) && line.getDisclosedGrowth() != null && result.getCalculatedValue() != null
+                        && !epsRoundingCompatible(line.getCurrent(), line.getPrior(), line.getDisclosedGrowth())) {
+                    result.setStatus("DISCLOSURE_MISMATCH");
+                    result.setMissingReason("披露同比不在本期与上期 EPS 原披露精度形成的复算区间内");
+                } else if ("basic_eps".equals(id) && line.getDisclosedGrowth() != null && result.getCalculatedValue() != null
+                        && line.getDisclosedGrowth().compareTo(result.getCalculatedValue()) != 0) {
+                    result.setPrecisionNote("披露同比与展示EPS复算存在差异；披露值落在原EPS精度复算区间，保留年报披露同比");
+                }
+            }
             details.put(id + "_growth", result);
         }
         addFormulaDetail(details, "simple_free_cash_flow_growth", simpleFreeCashFlowGrowth(byField), "(本期CFO-Capex－上期CFO+上期Capex)/abs(上期CFO-Capex)",
@@ -314,7 +380,29 @@ public class MetricCalculator {
             }
         }
         details.put(id, detail(value, status, reason, formula, inputs,
-                found.isEmpty() ? "unknown" : found.get(0).getScope(), period, unit, found.stream().map(this::evidence).toList()));
+                found.isEmpty() ? "unknown" : found.get(0).getScope(), period, unit, found.stream().flatMap(line -> periodEvidence(line, period).stream()).toList()));
+        var result = details.get(id);
+        if (!found.isEmpty()) {
+            result.setCurrentValue(found.get(0).getCurrent()); result.setPriorValue(found.get(0).getPrior());
+            result.setCurrentColumn(found.get(0).getCurrentColumn()); result.setPriorColumn(found.get(0).getPriorColumn());
+        }
+    }
+
+    private BigDecimal calculatedGrowth(ExtractedLine line) {
+        if (line == null || line.getCurrent() == null || line.getPrior() == null || line.getPrior().signum() == 0) return null;
+        return line.getCurrent().subtract(line.getPrior()).divide(line.getPrior().abs(), SCALE, RoundingMode.HALF_UP);
+    }
+
+    /** 用披露值舍入区间核验 EPS 同比，避免将年报精度差判为口径错误。 */
+    static boolean epsRoundingCompatible(BigDecimal current, BigDecimal prior, BigDecimal disclosed) {
+        if (current == null || prior == null || disclosed == null || current.signum() <= 0 || prior.signum() <= 0) return false;
+        BigDecimal currentHalf = BigDecimal.ONE.scaleByPowerOfTen(-Math.max(0, current.scale())).divide(BigDecimal.valueOf(2));
+        BigDecimal priorHalf = BigDecimal.ONE.scaleByPowerOfTen(-Math.max(0, prior.scale())).divide(BigDecimal.valueOf(2));
+        BigDecimal min = current.subtract(currentHalf).subtract(prior.add(priorHalf))
+                .divide(prior.add(priorHalf), SCALE, RoundingMode.HALF_UP);
+        BigDecimal max = current.add(currentHalf).subtract(prior.subtract(priorHalf))
+                .divide(prior.subtract(priorHalf), SCALE, RoundingMode.HALF_UP);
+        return disclosed.compareTo(min) >= 0 && disclosed.compareTo(max) <= 0;
     }
 
     private static FinancialMetricsDTO.MetricResult detail(BigDecimal value, String status, String reason, String formula,

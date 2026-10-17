@@ -56,7 +56,7 @@ class ExecutionPipelineTest {
         assertThat(storedReport.getReviewResult().getStatus()).isIn("ok", "degraded");
         assertThat(service.getMetrics(taskId).getCoreMetrics().getRevenue()).isNotNull();
         assertThat(service.getAnomalies(taskId)).isNotNull();
-        assertThat(service.getValuation(taskId).getBusinessStatus()).isEqualTo("INPUT_INCOMPLETE");
+        assertThat(service.getValuation(taskId).getBusinessStatus()).isEqualTo("BLOCKED_BY_DATA_QUALITY");
     }
 
     @Test

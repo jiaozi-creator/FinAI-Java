@@ -1,6 +1,8 @@
 package com.finai.analysis;
 
 import org.junit.jupiter.api.Test;
+import com.finai.agent.ReviewAgent;
+import com.finai.model.dto.AnalysisReportDTO;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -228,7 +230,63 @@ class StatementPipelineTest {
                 complete.replace("长期借款 50 50", ""))), "dcf-missing-debt.txt");
         var blocked = valuation.evaluate(incomplete.getLines(), calculator.calculate(incomplete.getLines(), "2023A"), new BigDecimal("0.05"));
         assertThat(blocked.getValuationRange()).isNull();
-        assertThat(blocked.getAssumptions()).anyMatch(item -> "净债务".equals(item.getParameter())
-                && "未计算（桥接输入不完整）".equals(item.getValue()));
+        assertThat(blocked.getNetDebtDiagnostic()).isNull();
+        assertThat(blocked.getNetDebtDiagnosticMissingItems()).anyMatch(item -> item.contains("long_term_debt"));
+    }
+
+    @Test
+    void cashFlowReconciliationExcludesReportedCfoAndReviewBlocksResidual() {
+        String text = """
+                现金流量表补充资料
+                单位：元
+                将净利润调节为经营活动现金流量：
+                净利润 100 80
+                固定资产折旧 5 4
+                合并现金流量表
+                经营活动产生的现金流量净额 105 84
+                """;
+        StatementExtract extract = extractor.extractPages(List.of(new PageText(10, text)), "cash-reconciliation.txt");
+        var metrics = calculator.calculate(extract.getLines(), "2023A");
+
+        assertThat(metrics.getCashFlowReconciliation().getAdjustmentTotal()).isEqualByComparingTo("5");
+        assertThat(metrics.getCashFlowReconciliation().getCalculatedOperatingCashFlow()).isEqualByComparingTo("105");
+        assertThat(metrics.getCashFlowReconciliation().getStatus()).isEqualTo("RECONCILED");
+        assertThat(metrics.getCashFlowReconciliation().getAdjustments()).extracting(item -> item.getFieldId())
+                .doesNotContain("reconciliation_operating_cash_flow");
+
+        var incompleteText = text.replace("固定资产折旧 5 4", "固定资产折旧 3 4");
+        var incomplete = calculator.calculate(extractor.extractPages(List.of(new PageText(10, incompleteText)), "cash-reconciliation-bad.txt").getLines(), "2023A");
+        var report = AnalysisReportDTO.builder().metrics(incomplete).build();
+        var review = new ReviewAgent().review(report);
+        assertThat(incomplete.getCashFlowReconciliation().getStatus()).isEqualTo("RECONCILIATION_FAILED");
+        assertThat(review.getWarnings()).anyMatch(warning -> warning.startsWith("CASH_FLOW_RECONCILIATION_FAILED"));
+    }
+
+    @Test
+    void netDebtDiagnosticIsIndependentFromUnconfirmedDcfInputs() {
+        String text = """
+                单位：元
+                合并资产负债表
+                2023年12月31日 2022年12月31日
+                货币资金 1,000 900
+                受限资金 100 80
+                短期借款 0 0
+                一年内到期的非流动负债 10 8
+                应付债券 0 0
+                租赁负债 5 4
+                长期借款 0 0
+                """;
+        StatementExtract extract = extractor.extractPages(List.of(new PageText(1, text)), "net-debt.txt");
+        var metrics = calculator.calculate(extract.getLines(), "2023A");
+        var valuationResult = valuation.evaluate(extract.getLines(), metrics);
+        assertThat(valuationResult.getBusinessStatus()).isEqualTo("INPUT_INCOMPLETE");
+        assertThat(valuationResult.getNetDebtDiagnosticStatus()).isEqualTo("COMPUTED");
+        assertThat(valuationResult.getNetDebtDiagnostic()).isEqualByComparingTo("-885");
+
+        var missingRestricted = extract.getLines().stream().filter(line -> !"restricted_cash".equals(line.getFieldId())).toList();
+        var incomplete = valuation.evaluate(missingRestricted, metrics);
+        assertThat(incomplete.getNetDebtDiagnostic()).isNull();
+        assertThat(incomplete.getNetDebtDiagnosticStatus()).isEqualTo("INPUT_INCOMPLETE");
+        assertThat(incomplete.getNetDebtDiagnosticMissingItems()).anyMatch(item -> item.contains("受限资金"));
     }
 }

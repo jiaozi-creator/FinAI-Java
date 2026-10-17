@@ -1,7 +1,7 @@
 import { Table, Tag } from 'antd'
 
 export const statusLabels = {
-  VALUE_AVAILABLE: '已提取/已计算', DISCLOSED_ZERO: '年报披露为零', SOURCE_NOT_FOUND: '原文未找到',
+  VALUE_AVAILABLE: '已提取/已计算', DISCLOSED_ZERO: '年报披露为零', SOURCE_NOT_FOUND: '原文未找到', DISCLOSURE_MISMATCH: '披露值与复算不一致',
   EXTRACTION_FAILED: '已披露但抽取失败', CALCULABLE_INPUT_AVAILABLE: '可按公式计算', INPUT_INCOMPLETE: '输入不完整',
   PERIOD_MISMATCH: '期间冲突', SCOPE_MISMATCH: '范围冲突', UNIT_MISMATCH: '单位冲突',
   NOT_APPLICABLE: '不适用', BLOCKED_BY_DATA_QUALITY: '因数据质量阻断', COMPUTED: '已计算',
@@ -36,12 +36,16 @@ const fields = [
   ['归母权益', 'net_assets', 'netAssets', 'netAssetsGrowth'],
   ['少数股东权益', 'minority_interest', 'minorityInterest', 'minorityInterestGrowth'],
   ['合并权益', 'total_equity', 'totalEquity'], ['货币资金', 'cash', 'cash'],
+  ['受限资金', 'restricted_cash', 'restrictedCash'], ['现金及现金等价物', 'cash_equivalents', 'cashEquivalents'],
+  ['应计定期存款利息', 'accrued_deposit_interest', 'accruedDepositInterest'],
+  ['受限同业存款（不重复扣现金）', 'restricted_interbank', 'restrictedInterbank'],
+  ['应收账款', 'accounts_receivable', 'accountsReceivable'],
   ['应收票据', 'notes_receivable', 'notesReceivable'],
   ['期末总股本', 'shares_outstanding', 'sharesOutstanding', 'sharesOutstandingGrowth'],
   ['基本每股收益', 'basic_eps', 'basicEps', 'basicEpsGrowth'],
 ]
 const ratios = [
-  ['毛利率', 'gross_margin', 'grossMargin', '%'], ['归母净利率', 'net_margin', 'netMargin', '%'],
+  ['合并报表派生毛利率', 'gross_margin', 'grossMargin', '%'], ['归母净利率', 'net_margin', 'netMargin', '%'],
   ['合并净利率（营业收入分母）', 'consolidated_net_margin', 'consolidatedNetMargin', '%'],
   ['加权平均 ROE（披露）', 'disclosed_weighted_roe', 'disclosedWeightedRoe', '%'],
   ['平均归母权益 ROE', 'average_equity_roe', 'averageEquityRoe', '%'], ['ROA', 'roa', 'roa', '%'],
@@ -73,6 +77,8 @@ export function MetricEvidence({ detail }) {
     <summary>公式与证据</summary>
     <p>{detail.formula || '财报直接披露'} · {sourceLabel(detail.source)}</p>
     <p>{detail.scope || '范围未标注'} · {detail.period || '期间未标注'}</p>
+    {detail.currentValue != null && <p>输入：本期 {detail.currentValue}；上期 {detail.priorValue ?? '未提取'}；列 {detail.currentColumn ?? '-'} / {detail.priorColumn ?? '-'}</p>}
+    {detail.disclosedValue != null && <p>年报披露同比：{(Number(detail.disclosedValue) * 100).toFixed(2)}%；公式复算：{detail.calculatedValue == null ? '不可计算' : `${(Number(detail.calculatedValue) * 100).toFixed(4)}%`}。{detail.precisionNote || ''}</p>}
     {(detail.evidenceRefs || []).map((e, i) => <div key={i} style={{ marginBottom: 8, whiteSpace: 'pre-wrap' }}>
       第 {e.page ?? '-'} 页 · {e.period} · {e.unit} · {e.value}<br />{e.snippet}
     </div>)}

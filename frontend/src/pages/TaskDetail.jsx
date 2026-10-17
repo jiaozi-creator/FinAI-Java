@@ -6,6 +6,7 @@ import { taskAPI, auditAPI } from '../services/api'
 import FinancialMetricsTable, { formatMetric, sourceLabel } from '../components/FinancialMetricsTable'
 import PageHeader from '../components/PageHeader'
 import ValuationInputForm from '../components/ValuationInputForm'
+import { FinancialAnalysis, ValuationSummary } from '../components/AnalysisResults'
 
 const fmtAmount = (value) => formatMetric(value, { unit: '元' })
 const fmtPct = (value) => formatMetric(value, { unit: '%' }, 'pct')
@@ -269,6 +270,7 @@ function TaskDetail() {
         <Space direction="vertical" size={16} style={{ width: '100%', marginTop: 16 }}>
           <Card title={`财务指标（${metrics?.unit || '单位未标注'}；同比；环比未计算）`}>
             <FinancialMetricsTable metrics={metrics} />
+            <FinancialAnalysis metrics={metrics} />
           </Card>
 
           {(metrics?.nonRecurringItems || []).length > 0 && (
@@ -320,6 +322,7 @@ function TaskDetail() {
 
           <Card title="估值">
             <ValuationInputForm taskId={taskId} disabled={task.status !== 'COMPLETED' && task.status !== 'FAILED'} />
+            <ValuationSummary valuation={valuation} />
             {!valuation?.valuationRange ? (
               <Alert
                 type="warning"

@@ -37,7 +37,7 @@ class FilingProbeTest {
         Map<String, ExtractedLine> byId = extract.getLines().stream()
                 .collect(Collectors.toMap(ExtractedLine::getFieldId, Function.identity(), (a, b) -> a));
         assertAmount(byId, "net_profit", "-9822497.95", "-151420324.40", "consolidated");
-        assertAmount(byId, "net_profit_deducted", "-39312271.78", "-279702121.97", "summary");
+        assertAmount(byId, "net_profit_deducted", "-39312271.78", "-279702121.97", "consolidated");
         assertAmount(byId, "cash", "1088855303.96", "1006282974.26", "consolidated");
         assertAmount(byId, "inventory", "1781225167.08", "1643949298.23", "consolidated");
         assertAmount(byId, "minority_interest", "41232492.55", "57869285.87", "consolidated");

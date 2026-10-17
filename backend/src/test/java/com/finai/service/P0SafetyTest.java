@@ -40,7 +40,7 @@ class P0SafetyTest {
         assertThat(assessment.getOverallRiskScore()).isNull();
         assertThat(assessment.getOverallRiskLevel()).isNull();
         assertThat(assessment.getRiskScores().values()).allMatch(score -> score.getScore() == null);
-        assertThat(assessment.getSummary()).contains("尚未实现");
+        assertThat(assessment.getSummary()).contains("未计算");
     }
 
     @Test

@@ -79,7 +79,8 @@ public class AuditLog {
     /**
      * 错误信息
      */
-    @Column(name = "error_message", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "error_message")
     private String errorMessage;
 
     /**

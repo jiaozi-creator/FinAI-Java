@@ -40,6 +40,9 @@ public class ChatResponseDTO {
      * 建议的后续问题
      */
     private List<String> suggestedQuestions;
+    private String requestId;
+    private String status;
+    private String degradationReason;
 
     @Data
     @Builder

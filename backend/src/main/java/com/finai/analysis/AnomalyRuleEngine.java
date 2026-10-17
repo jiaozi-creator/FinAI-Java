@@ -58,9 +58,9 @@ public class AnomalyRuleEngine {
         }
         BigDecimal gap = core.getNetProfit().subtract(core.getNetProfitDeducted()).abs();
         BigDecimal ratio = gap.divide(core.getNetProfit().abs(), 8, RoundingMode.HALF_UP);
-        if (ratio.compareTo(NON_RECURRING_THRESHOLD) < 0) {
+        if (ratio.compareTo(nonRecurringThreshold) < 0) {
             signals.add(ruleResult("ANO-NR-1", "非经常性损益占比", AnomalySignalDTO.AnomalyType.NON_RECURRING_ITEMS,
-                    "NOT_TRIGGERED", "VALID", ratio, NON_RECURRING_THRESHOLD,
+                    "NOT_TRIGGERED", "VALID", ratio, nonRecurringThreshold,
                     "全年归母净利润与扣非归母净利润差额占比未达到阈值。",
                     List.of("net_profit", "net_profit_deducted"), byField));
             return;
@@ -117,7 +117,7 @@ public class AnomalyRuleEngine {
         boolean thin = coverage.compareTo(cashCoverageThreshold) < 0;
         if (!signSplit && !thin && !yoySplit) {
             signals.add(ruleResult("ANO-CF-1", "利润与现金流背离", AnomalySignalDTO.AnomalyType.PROFIT_CASHFLOW_DIVERGENCE,
-                    "NOT_TRIGGERED", "VALID", coverage, CASH_COVERAGE_THRESHOLD,
+                    "NOT_TRIGGERED", "VALID", coverage, cashCoverageThreshold,
                     "全年经营现金流与归母净利润未达到背离阈值。",
                     List.of("net_profit", "operating_cash_flow"), byField));
             return;
@@ -211,14 +211,15 @@ public class AnomalyRuleEngine {
                 && line.getUnit() != null && !"未标注".equals(line.getUnit())
                 && (line.getDataQualityStatus() == null
                     || "VALID".equals(line.getDataQualityStatus())
+                    || "VALUE_AVAILABLE".equals(line.getDataQualityStatus())
                     || "DISCLOSED_ZERO".equals(line.getDataQualityStatus()));
     }
 
     private AnomalySignalDTO notEvaluated(String id, String name, AnomalySignalDTO.AnomalyType type,
                                           String reason, List<String> fields) {
         BigDecimal configuredThreshold = switch (id) {
-            case "ANO-NR-1" -> NON_RECURRING_THRESHOLD;
-            case "ANO-CF-1" -> CASH_COVERAGE_THRESHOLD;
+            case "ANO-NR-1" -> nonRecurringThreshold;
+            case "ANO-CF-1" -> cashCoverageThreshold;
             default -> null;
         };
         return AnomalySignalDTO.builder()

@@ -45,4 +45,6 @@ public class ChatMessageDTO {
      * 引用的数据源（如具体的财务指标、证据ID等）
      */
     private String[] references;
+    private String requestId;
+    private String status;
 }
